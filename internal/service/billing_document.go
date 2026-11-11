@@ -243,7 +243,8 @@ func (s *BillingDocumentService) Convert(ctx context.Context, customerID, estima
 		for i := range items {
 			items[i].ID, items[i].BillingDocumentID = 0, 0
 		}
-		today := s.now().UTC().Truncate(24 * time.Hour)
+		n := s.now() // the server's local calendar day, not the UTC one
+		today := time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, time.UTC)
 		invoiceID, err = tx.Create(ctx, model.BillingDocument{
 			ParentType:      model.ParentInvoice,
 			CustomerID:      customerID,

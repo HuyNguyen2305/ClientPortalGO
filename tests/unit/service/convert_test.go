@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"clientportal/internal/model"
+	"clientportal/internal/service"
+	"clientportal/tests/unit/mocks"
 )
 
 // fixedNow is the clock every service test runs with: 2026-11-11 15:30 UTC.
@@ -57,6 +59,24 @@ func TestConvert(t *testing.T) {
 		got, err := f.svc.Convert(context.Background(), custID, 4)
 		require.NoError(t, err)
 		assert.Equal(t, int64(90), got.ID)
+	})
+
+	t.Run("dated with the local calendar day", func(t *testing.T) {
+		// 06:00 on the 12th at +07:00 is still the 11th in UTC.
+		clock := func() time.Time { return time.Date(2026, 11, 12, 6, 0, 0, 0, time.FixedZone("ICT", 7*3600)) }
+		docs := mocks.NewMockBillingDocumentRepository(t)
+		docs.EXPECT().WithTx(mock.Anything, mock.Anything).
+			RunAndReturn(func(_ context.Context, fn func(service.BillingDocumentRepository) error) error { return fn(docs) })
+		docs.EXPECT().GetForUpdate(mock.Anything, custID, model.ParentEstimate, int64(4)).Return(acceptedEstimate(), nil)
+		docs.EXPECT().ListItems(mock.Anything, mock.Anything).Return(nil, nil)
+		docs.EXPECT().Create(mock.Anything, mock.MatchedBy(func(d model.BillingDocument) bool {
+			return d.DocumentDate.Equal(time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC))
+		})).Return(int64(90), nil)
+		docs.EXPECT().Get(mock.Anything, custID, model.ParentInvoice, int64(90)).Return(model.BillingDocument{ID: 90}, nil)
+
+		svc := service.NewBillingDocumentService(docs, mocks.NewMockLocationRepository(t), clock)
+		_, err := svc.Convert(context.Background(), custID, 4)
+		require.NoError(t, err)
 	})
 
 	t.Run("already converted", func(t *testing.T) {
