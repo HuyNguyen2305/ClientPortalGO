@@ -26,6 +26,7 @@ type BillingDocumentRepository interface {
 	// Update replaces title, date, location, total and items.
 	Update(ctx context.Context, d model.BillingDocument) error
 	Delete(ctx context.Context, id int64) error
+	UpdateStatus(ctx context.Context, id int64, status model.Status) error
 }
 
 // BillingDocumentService manages invoices and estimates.
@@ -150,6 +151,24 @@ func (s *BillingDocumentService) Update(ctx context.Context, customerID int64, p
 	})
 	if err != nil {
 		return model.BillingDocument{}, fmt.Errorf("update %s: %w", pt, err)
+	}
+	return s.Get(ctx, customerID, pt, id)
+}
+
+// Transition moves a document to status `to` when the transition table allows it.
+func (s *BillingDocumentService) Transition(ctx context.Context, customerID int64, pt model.ParentType, id int64, to model.Status) (model.BillingDocument, error) {
+	err := s.docs.WithTx(ctx, func(tx BillingDocumentRepository) error {
+		doc, err := tx.GetForUpdate(ctx, customerID, pt, id)
+		if err != nil {
+			return err
+		}
+		if !model.CanTransition(pt, doc.Status, to) {
+			return fmt.Errorf("%w: %s %d cannot move from %s to %s", model.ErrConflict, pt, doc.Number, doc.Status, to)
+		}
+		return tx.UpdateStatus(ctx, id, to)
+	})
+	if err != nil {
+		return model.BillingDocument{}, fmt.Errorf("%s %s: %w", to, pt, err)
 	}
 	return s.Get(ctx, customerID, pt, id)
 }

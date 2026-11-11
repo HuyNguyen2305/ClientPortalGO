@@ -116,6 +116,23 @@ func (h *BillingDocumentHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.FromDocument(doc, true))
 }
 
+// Transition returns a handler for POST /:id/<action> that moves the document to status `to`.
+func (h *BillingDocumentHandler) Transition(to model.Status) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id, err := PathID(c)
+		if err != nil {
+			RespondError(c, err)
+			return
+		}
+		doc, err := h.svc.Transition(c.Request.Context(), middleware.CustomerID(c), h.pt, id, to)
+		if err != nil {
+			RespondError(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, dto.FromDocument(doc, true))
+	}
+}
+
 // Delete serves DELETE /:id.
 func (h *BillingDocumentHandler) Delete(c *gin.Context) {
 	id, err := PathID(c)

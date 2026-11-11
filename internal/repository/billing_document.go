@@ -188,6 +188,17 @@ func (r *BillingDocuments) Update(ctx context.Context, d model.BillingDocument) 
 	return r.insertItems(ctx, d.ID, d.Items)
 }
 
+// UpdateStatus sets a document's status. Call it inside WithTx after GetForUpdate.
+func (r *BillingDocuments) UpdateStatus(ctx context.Context, id int64, status model.Status) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	if _, err := r.db.Exec(ctx,
+		`UPDATE billing_documents SET status = $2, updated_at = now() WHERE id = $1`, id, string(status)); err != nil {
+		return fmt.Errorf("update status of %d: %w", id, mapErr(err))
+	}
+	return nil
+}
+
 // Delete removes a document; its items go with it.
 func (r *BillingDocuments) Delete(ctx context.Context, id int64) error {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)

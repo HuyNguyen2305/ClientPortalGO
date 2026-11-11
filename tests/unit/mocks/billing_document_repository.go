@@ -520,6 +520,69 @@ func (_c *MockBillingDocumentRepository_Update_Call) RunAndReturn(run func(ctx c
 	return _c
 }
 
+// UpdateStatus provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) UpdateStatus(ctx context.Context, id int64, status model.Status) error {
+	ret := _mock.Called(ctx, id, status)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateStatus")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, model.Status) error); ok {
+		r0 = returnFunc(ctx, id, status)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockBillingDocumentRepository_UpdateStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateStatus'
+type MockBillingDocumentRepository_UpdateStatus_Call struct {
+	*mock.Call
+}
+
+// UpdateStatus is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+//   - status model.Status
+func (_e *MockBillingDocumentRepository_Expecter) UpdateStatus(ctx any, id any, status any) *MockBillingDocumentRepository_UpdateStatus_Call {
+	return &MockBillingDocumentRepository_UpdateStatus_Call{Call: _e.mock.On("UpdateStatus", ctx, id, status)}
+}
+
+func (_c *MockBillingDocumentRepository_UpdateStatus_Call) Run(run func(ctx context.Context, id int64, status model.Status)) *MockBillingDocumentRepository_UpdateStatus_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 model.Status
+		if args[2] != nil {
+			arg2 = args[2].(model.Status)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_UpdateStatus_Call) Return(err error) *MockBillingDocumentRepository_UpdateStatus_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_UpdateStatus_Call) RunAndReturn(run func(ctx context.Context, id int64, status model.Status) error) *MockBillingDocumentRepository_UpdateStatus_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // WithTx provides a mock function for the type MockBillingDocumentRepository
 func (_mock *MockBillingDocumentRepository) WithTx(ctx context.Context, fn func(service.BillingDocumentRepository) error) error {
 	ret := _mock.Called(ctx, fn)

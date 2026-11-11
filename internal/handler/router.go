@@ -49,7 +49,7 @@ func NewRouter(d Deps) *gin.Engine {
 	scoped.DELETE("/locations/:id", locations.delete)
 
 	// Invoices and estimates share one handler type, fixed to a parent type per route group.
-	for path, pt := range map[string]model.ParentType{"/invoices": model.ParentInvoice, "/estimates": model.ParentEstimate} {
+	docGroup := func(path string, pt model.ParentType) (*gin.RouterGroup, *BillingDocumentHandler) {
 		h := NewBillingDocumentHandler(d.Documents, pt)
 		g := scoped.Group(path)
 		g.GET("", h.List)
@@ -57,7 +57,16 @@ func NewRouter(d Deps) *gin.Engine {
 		g.GET("/:id", h.Get)
 		g.PUT("/:id", h.Update)
 		g.DELETE("/:id", h.Delete)
+		g.POST("/:id/send", h.Transition(model.StatusOpen))
+		return g, h
 	}
+
+	invoices, inv := docGroup("/invoices", model.ParentInvoice)
+	invoices.POST("/:id/void", inv.Transition(model.StatusVoid))
+
+	estimates, est := docGroup("/estimates", model.ParentEstimate)
+	estimates.POST("/:id/accept", est.Transition(model.StatusAccepted))
+	estimates.POST("/:id/decline", est.Transition(model.StatusDeclined))
 
 	return r
 }
