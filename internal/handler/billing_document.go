@@ -133,6 +133,56 @@ func (h *BillingDocumentHandler) Transition(to model.Status) gin.HandlerFunc {
 	}
 }
 
+// RecordPayment serves POST /invoices/:id/payments.
+func (h *BillingDocumentHandler) RecordPayment(c *gin.Context) {
+	id, err := PathID(c)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	var req dto.PaymentRequest
+	if err := bindJSON(c, &req); err != nil {
+		RespondError(c, err)
+		return
+	}
+	doc, err := h.svc.RecordPayment(c.Request.Context(), middleware.CustomerID(c), id, req.AmountCents)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, dto.FromDocument(doc, true))
+}
+
+// ListPayments serves GET /invoices/:id/payments.
+func (h *BillingDocumentHandler) ListPayments(c *gin.Context) {
+	id, err := PathID(c)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	ps, err := h.svc.ListPayments(c.Request.Context(), middleware.CustomerID(c), id)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, dto.Page[dto.PaymentResponse]{Data: dto.MapSlice(ps, dto.FromPayment)})
+}
+
+// Balance serves GET /balance.
+func (h *BillingDocumentHandler) Balance(c *gin.Context) {
+	loc, err := QueryInt64(c, "location_id")
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	b, err := h.svc.Balance(c.Request.Context(), middleware.CustomerID(c), loc)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, dto.BalanceResponse{BalanceCents: b})
+}
+
 // Delete serves DELETE /:id.
 func (h *BillingDocumentHandler) Delete(c *gin.Context) {
 	id, err := PathID(c)

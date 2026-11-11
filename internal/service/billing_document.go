@@ -27,6 +27,11 @@ type BillingDocumentRepository interface {
 	Update(ctx context.Context, d model.BillingDocument) error
 	Delete(ctx context.Context, id int64) error
 	UpdateStatus(ctx context.Context, id int64, status model.Status) error
+	// AddPayment records a payment and moves amount_paid_cents and status with it.
+	AddPayment(ctx context.Context, documentID, amountCents int64, newStatus model.Status) error
+	ListPayments(ctx context.Context, documentID int64) ([]model.Payment, error)
+	// Balance sums the balance due over the customer's open and partially paid invoices.
+	Balance(ctx context.Context, customerID int64, locationID *int64) (int64, error)
 }
 
 // BillingDocumentService manages invoices and estimates.
@@ -171,6 +176,50 @@ func (s *BillingDocumentService) Transition(ctx context.Context, customerID int6
 		return model.BillingDocument{}, fmt.Errorf("%s %s: %w", to, pt, err)
 	}
 	return s.Get(ctx, customerID, pt, id)
+}
+
+// RecordPayment applies a payment to an open or partially paid invoice. The invoice row is
+// locked for the whole transaction, so two concurrent payments cannot overpay it.
+func (s *BillingDocumentService) RecordPayment(ctx context.Context, customerID, invoiceID, amountCents int64) (model.BillingDocument, error) {
+	err := s.docs.WithTx(ctx, func(tx BillingDocumentRepository) error {
+		doc, err := tx.GetForUpdate(ctx, customerID, model.ParentInvoice, invoiceID)
+		if err != nil {
+			return err
+		}
+		if amountCents > doc.BalanceDueCents() {
+			return fmt.Errorf("%w: payment of %d exceeds the balance due of %d", model.ErrConflict, amountCents, doc.BalanceDueCents())
+		}
+		next := model.StatusAfterPayment(doc.TotalCents, doc.AmountPaidCents+amountCents)
+		if !model.CanTransition(model.ParentInvoice, doc.Status, next) {
+			return fmt.Errorf("%w: a %s invoice cannot take payments", model.ErrConflict, doc.Status)
+		}
+		return tx.AddPayment(ctx, invoiceID, amountCents, next)
+	})
+	if err != nil {
+		return model.BillingDocument{}, fmt.Errorf("record payment: %w", err)
+	}
+	return s.Get(ctx, customerID, model.ParentInvoice, invoiceID)
+}
+
+// ListPayments returns the payments on one of the customer's invoices.
+func (s *BillingDocumentService) ListPayments(ctx context.Context, customerID, invoiceID int64) ([]model.Payment, error) {
+	if _, err := s.docs.Get(ctx, customerID, model.ParentInvoice, invoiceID); err != nil {
+		return nil, fmt.Errorf("list payments: %w", err)
+	}
+	ps, err := s.docs.ListPayments(ctx, invoiceID)
+	if err != nil {
+		return nil, fmt.Errorf("list payments: %w", err)
+	}
+	return ps, nil
+}
+
+// Balance is what the customer owes, optionally for one location.
+func (s *BillingDocumentService) Balance(ctx context.Context, customerID int64, locationID *int64) (int64, error) {
+	b, err := s.docs.Balance(ctx, customerID, locationID)
+	if err != nil {
+		return 0, fmt.Errorf("balance: %w", err)
+	}
+	return b, nil
 }
 
 // Delete removes a draft.

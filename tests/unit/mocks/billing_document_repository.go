@@ -48,6 +48,147 @@ func (_m *MockBillingDocumentRepository) EXPECT() *MockBillingDocumentRepository
 	return &MockBillingDocumentRepository_Expecter{mock: &_m.Mock}
 }
 
+// AddPayment provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) AddPayment(ctx context.Context, documentID int64, amountCents int64, newStatus model.Status) error {
+	ret := _mock.Called(ctx, documentID, amountCents, newStatus)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AddPayment")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64, model.Status) error); ok {
+		r0 = returnFunc(ctx, documentID, amountCents, newStatus)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockBillingDocumentRepository_AddPayment_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AddPayment'
+type MockBillingDocumentRepository_AddPayment_Call struct {
+	*mock.Call
+}
+
+// AddPayment is a helper method to define mock.On call
+//   - ctx context.Context
+//   - documentID int64
+//   - amountCents int64
+//   - newStatus model.Status
+func (_e *MockBillingDocumentRepository_Expecter) AddPayment(ctx any, documentID any, amountCents any, newStatus any) *MockBillingDocumentRepository_AddPayment_Call {
+	return &MockBillingDocumentRepository_AddPayment_Call{Call: _e.mock.On("AddPayment", ctx, documentID, amountCents, newStatus)}
+}
+
+func (_c *MockBillingDocumentRepository_AddPayment_Call) Run(run func(ctx context.Context, documentID int64, amountCents int64, newStatus model.Status)) *MockBillingDocumentRepository_AddPayment_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		var arg3 model.Status
+		if args[3] != nil {
+			arg3 = args[3].(model.Status)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_AddPayment_Call) Return(err error) *MockBillingDocumentRepository_AddPayment_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_AddPayment_Call) RunAndReturn(run func(ctx context.Context, documentID int64, amountCents int64, newStatus model.Status) error) *MockBillingDocumentRepository_AddPayment_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Balance provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) Balance(ctx context.Context, customerID int64, locationID *int64) (int64, error) {
+	ret := _mock.Called(ctx, customerID, locationID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Balance")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, *int64) (int64, error)); ok {
+		return returnFunc(ctx, customerID, locationID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, *int64) int64); ok {
+		r0 = returnFunc(ctx, customerID, locationID)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64, *int64) error); ok {
+		r1 = returnFunc(ctx, customerID, locationID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBillingDocumentRepository_Balance_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Balance'
+type MockBillingDocumentRepository_Balance_Call struct {
+	*mock.Call
+}
+
+// Balance is a helper method to define mock.On call
+//   - ctx context.Context
+//   - customerID int64
+//   - locationID *int64
+func (_e *MockBillingDocumentRepository_Expecter) Balance(ctx any, customerID any, locationID any) *MockBillingDocumentRepository_Balance_Call {
+	return &MockBillingDocumentRepository_Balance_Call{Call: _e.mock.On("Balance", ctx, customerID, locationID)}
+}
+
+func (_c *MockBillingDocumentRepository_Balance_Call) Run(run func(ctx context.Context, customerID int64, locationID *int64)) *MockBillingDocumentRepository_Balance_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 *int64
+		if args[2] != nil {
+			arg2 = args[2].(*int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_Balance_Call) Return(n int64, err error) *MockBillingDocumentRepository_Balance_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_Balance_Call) RunAndReturn(run func(ctx context.Context, customerID int64, locationID *int64) (int64, error)) *MockBillingDocumentRepository_Balance_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Create provides a mock function for the type MockBillingDocumentRepository
 func (_mock *MockBillingDocumentRepository) Create(ctx context.Context, d model.BillingDocument) (int64, error) {
 	ret := _mock.Called(ctx, d)
@@ -459,6 +600,74 @@ func (_c *MockBillingDocumentRepository_ListItems_Call) Return(items []model.Ite
 }
 
 func (_c *MockBillingDocumentRepository_ListItems_Call) RunAndReturn(run func(ctx context.Context, documentID int64) ([]model.Item, error)) *MockBillingDocumentRepository_ListItems_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListPayments provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) ListPayments(ctx context.Context, documentID int64) ([]model.Payment, error) {
+	ret := _mock.Called(ctx, documentID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListPayments")
+	}
+
+	var r0 []model.Payment
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) ([]model.Payment, error)); ok {
+		return returnFunc(ctx, documentID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) []model.Payment); ok {
+		r0 = returnFunc(ctx, documentID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]model.Payment)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = returnFunc(ctx, documentID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBillingDocumentRepository_ListPayments_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPayments'
+type MockBillingDocumentRepository_ListPayments_Call struct {
+	*mock.Call
+}
+
+// ListPayments is a helper method to define mock.On call
+//   - ctx context.Context
+//   - documentID int64
+func (_e *MockBillingDocumentRepository_Expecter) ListPayments(ctx any, documentID any) *MockBillingDocumentRepository_ListPayments_Call {
+	return &MockBillingDocumentRepository_ListPayments_Call{Call: _e.mock.On("ListPayments", ctx, documentID)}
+}
+
+func (_c *MockBillingDocumentRepository_ListPayments_Call) Run(run func(ctx context.Context, documentID int64)) *MockBillingDocumentRepository_ListPayments_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_ListPayments_Call) Return(payments []model.Payment, err error) *MockBillingDocumentRepository_ListPayments_Call {
+	_c.Call.Return(payments, err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_ListPayments_Call) RunAndReturn(run func(ctx context.Context, documentID int64) ([]model.Payment, error)) *MockBillingDocumentRepository_ListPayments_Call {
 	_c.Call.Return(run)
 	return _c
 }

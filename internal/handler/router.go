@@ -63,6 +63,9 @@ func NewRouter(d Deps) *gin.Engine {
 
 	invoices, inv := docGroup("/invoices", model.ParentInvoice)
 	invoices.POST("/:id/void", inv.Transition(model.StatusVoid))
+	invoices.POST("/:id/payments", inv.RecordPayment)
+	invoices.GET("/:id/payments", inv.ListPayments)
+	scoped.GET("/balance", inv.Balance)
 
 	estimates, est := docGroup("/estimates", model.ParentEstimate)
 	estimates.POST("/:id/accept", est.Transition(model.StatusAccepted))

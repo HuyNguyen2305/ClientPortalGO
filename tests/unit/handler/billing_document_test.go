@@ -108,6 +108,15 @@ func TestBillingDocumentHandler_AcceptsZeroUnitPrice(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())
 }
 
+func TestPaymentHandler_RejectsBadAmounts(t *testing.T) {
+	for _, b := range []string{`{"amount_cents":0}`, `{"amount_cents":-5}`, `{}`, `{"amount_cents":"ten"}`} {
+		t.Run(b, func(t *testing.T) {
+			rec := sendAs(docRouter(t), http.MethodPost, "/api/v1/invoices/9/payments", b)
+			assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+		})
+	}
+}
+
 func TestBillingDocumentHandler_RejectsBadQueries(t *testing.T) {
 	paths := []string{
 		"/api/v1/invoices/abc",
@@ -118,6 +127,8 @@ func TestBillingDocumentHandler_RejectsBadQueries(t *testing.T) {
 		"/api/v1/estimates?status=paid",
 		"/api/v1/estimates?status=bogus",
 		"/api/v1/estimates/0",
+		"/api/v1/balance?location_id=x",
+		"/api/v1/invoices/abc/payments",
 	}
 	for _, p := range paths {
 		t.Run(p, func(t *testing.T) {
