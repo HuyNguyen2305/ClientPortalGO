@@ -1,0 +1,53 @@
+version: '3'
+
+dotenv: ['.env']
+
+vars:
+  TOOL: go tool -modfile=tools/go.mod
+
+tasks:
+  test:
+    desc: Unit tests
+    cmds:
+      - go test ./tests/unit/...
+
+  test:integration:
+    desc: Integration tests (needs TEST_POSTGRES_URL)
+    cmds:
+      - go test -tags integration -p 1 ./tests/integration/...
+
+  check:
+    desc: gofmt, vet and lint
+    cmds:
+      - |
+        out=$(gofmt -l .)
+        if [ -n "$out" ]; then echo "gofmt needed:"; echo "$out"; exit 1; fi
+      - go vet -tags integration ./...
+      - '{{.TOOL}} golangci-lint run --build-tags integration ./...'
+
+  mocks:
+    desc: Regenerate mockery mocks
+    cmds:
+      - '{{.TOOL}} mockery'
+
+  migrate:up:
+    desc: Apply all migrations to DATABASE_URL
+    env: { GOFLAGS: "-tags=postgres,file" }
+    cmds:
+      - '{{.TOOL}} migrate -path migrations -database "$DATABASE_URL" up'
+
+  migrate:down:
+    desc: Roll back one migration on DATABASE_URL
+    env: { GOFLAGS: "-tags=postgres,file" }
+    cmds:
+      - '{{.TOOL}} migrate -path migrations -database "$DATABASE_URL" down 1'
+
+  seed:
+    desc: Load seeds/dev.sql into DATABASE_URL
+    cmds:
+      - go run ./cmd/seed
+
+  run:
+    desc: Run the API server
+    cmds:
+      - go run ./cmd/api

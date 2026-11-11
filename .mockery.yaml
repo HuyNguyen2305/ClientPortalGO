@@ -1,0 +1,9 @@
+all: false
+dir: tests/unit/mocks
+pkgname: mocks
+filename: "{{.InterfaceName | snakecase}}.go"
+structname: "Mock{{.InterfaceName}}"
+packages:
+  clientportal/internal/service:
+    config:
+      all: true
