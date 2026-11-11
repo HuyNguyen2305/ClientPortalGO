@@ -4,6 +4,7 @@ dotenv: ['.env']
 
 vars:
   TOOL: go tool -modfile=tools/go.mod
+  MIGRATE: go run -modfile=tools/go.mod -tags 'postgres file' github.com/golang-migrate/migrate/v4/cmd/migrate
 
 tasks:
   test:
@@ -30,17 +31,16 @@ tasks:
     cmds:
       - '{{.TOOL}} mockery'
 
+  # `go tool` builds migrate without driver build tags, so run it with explicit tags.
   migrate:up:
     desc: Apply all migrations to DATABASE_URL
-    env: { GOFLAGS: "-tags=postgres,file" }
     cmds:
-      - '{{.TOOL}} migrate -path migrations -database "$DATABASE_URL" up'
+      - '{{.MIGRATE}} -path migrations -database "$DATABASE_URL" up'
 
   migrate:down:
     desc: Roll back one migration on DATABASE_URL
-    env: { GOFLAGS: "-tags=postgres,file" }
     cmds:
-      - '{{.TOOL}} migrate -path migrations -database "$DATABASE_URL" down 1'
+      - '{{.MIGRATE}} -path migrations -database "$DATABASE_URL" down 1'
 
   seed:
     desc: Load seeds/dev.sql into DATABASE_URL
