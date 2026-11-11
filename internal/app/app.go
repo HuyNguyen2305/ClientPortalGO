@@ -23,7 +23,7 @@ func New(pool *pgxpool.Pool, queryTimeout time.Duration, log *slog.Logger) http.
 		Ping:      pool.Ping,
 		Customers: service.NewCustomerService(repository.NewCustomers(pool, queryTimeout)),
 		Locations: service.NewLocationService(locations),
-		Documents: service.NewBillingDocumentService(documents, locations),
+		Documents: service.NewBillingDocumentService(documents, locations, time.Now),
 	})
 }
 

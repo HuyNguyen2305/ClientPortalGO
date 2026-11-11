@@ -31,7 +31,7 @@ func newDocFixture(t *testing.T) docFixture {
 	docs.EXPECT().WithTx(mock.Anything, mock.Anything).
 		RunAndReturn(func(_ context.Context, fn func(service.BillingDocumentRepository) error) error { return fn(docs) }).
 		Maybe()
-	return docFixture{docs: docs, locs: locs, svc: service.NewBillingDocumentService(docs, locs)}
+	return docFixture{docs: docs, locs: locs, svc: service.NewBillingDocumentService(docs, locs, fixedNow)}
 }
 
 func twoItems() []model.Item {

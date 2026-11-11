@@ -70,6 +70,7 @@ func NewRouter(d Deps) *gin.Engine {
 	estimates, est := docGroup("/estimates", model.ParentEstimate)
 	estimates.POST("/:id/accept", est.Transition(model.StatusAccepted))
 	estimates.POST("/:id/decline", est.Transition(model.StatusDeclined))
+	estimates.POST("/:id/convert", est.Convert)
 
 	return r
 }

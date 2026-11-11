@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -38,11 +39,12 @@ type BillingDocumentRepository interface {
 type BillingDocumentService struct {
 	docs BillingDocumentRepository
 	locs LocationRepository
+	now  func() time.Time
 }
 
-// NewBillingDocumentService returns a billing document service.
-func NewBillingDocumentService(docs BillingDocumentRepository, locs LocationRepository) *BillingDocumentService {
-	return &BillingDocumentService{docs: docs, locs: locs}
+// NewBillingDocumentService returns a billing document service; now dates converted invoices.
+func NewBillingDocumentService(docs BillingDocumentRepository, locs LocationRepository, now func() time.Time) *BillingDocumentService {
+	return &BillingDocumentService{docs: docs, locs: locs, now: now}
 }
 
 // checkInput trims the title and confirms the location belongs to the customer.
@@ -220,6 +222,45 @@ func (s *BillingDocumentService) Balance(ctx context.Context, customerID int64, 
 		return 0, fmt.Errorf("balance: %w", err)
 	}
 	return b, nil
+}
+
+// Convert turns an accepted estimate into a new draft invoice with the same title, location
+// and items, dated today. An estimate converts once; a second attempt is ErrConflict.
+func (s *BillingDocumentService) Convert(ctx context.Context, customerID, estimateID int64) (model.BillingDocument, error) {
+	var invoiceID int64
+	err := s.docs.WithTx(ctx, func(tx BillingDocumentRepository) error {
+		est, err := tx.GetForUpdate(ctx, customerID, model.ParentEstimate, estimateID)
+		if err != nil {
+			return err
+		}
+		if est.Status != model.StatusAccepted {
+			return fmt.Errorf("%w: estimate %d is %s; only accepted estimates convert", model.ErrConflict, est.Number, est.Status)
+		}
+		items, err := tx.ListItems(ctx, estimateID)
+		if err != nil {
+			return err
+		}
+		for i := range items {
+			items[i].ID, items[i].BillingDocumentID = 0, 0
+		}
+		today := s.now().UTC().Truncate(24 * time.Hour)
+		invoiceID, err = tx.Create(ctx, model.BillingDocument{
+			ParentType:      model.ParentInvoice,
+			CustomerID:      customerID,
+			Location:        model.Location{ID: est.Location.ID},
+			Title:           est.Title,
+			Status:          model.StatusDraft,
+			DocumentDate:    today,
+			TotalCents:      model.SumItems(items),
+			ConvertedFromID: &est.ID,
+			Items:           items,
+		})
+		return err
+	})
+	if err != nil {
+		return model.BillingDocument{}, fmt.Errorf("convert estimate: %w", err)
+	}
+	return s.Get(ctx, customerID, model.ParentInvoice, invoiceID)
 }
 
 // Delete removes a draft.

@@ -133,6 +133,21 @@ func (h *BillingDocumentHandler) Transition(to model.Status) gin.HandlerFunc {
 	}
 }
 
+// Convert serves POST /estimates/:id/convert and answers with the new invoice.
+func (h *BillingDocumentHandler) Convert(c *gin.Context) {
+	id, err := PathID(c)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	inv, err := h.svc.Convert(c.Request.Context(), middleware.CustomerID(c), id)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, dto.FromDocument(inv, true))
+}
+
 // RecordPayment serves POST /invoices/:id/payments.
 func (h *BillingDocumentHandler) RecordPayment(c *gin.Context) {
 	id, err := PathID(c)

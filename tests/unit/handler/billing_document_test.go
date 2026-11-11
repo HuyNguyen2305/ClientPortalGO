@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -27,7 +28,7 @@ func docRouter(t *testing.T) http.Handler {
 		Log:       quietLog(),
 		Customers: service.NewCustomerService(customers),
 		Locations: service.NewLocationService(locs),
-		Documents: service.NewBillingDocumentService(docs, locs),
+		Documents: service.NewBillingDocumentService(docs, locs, time.Now),
 	})
 }
 
@@ -102,7 +103,7 @@ func TestBillingDocumentHandler_AcceptsZeroUnitPrice(t *testing.T) {
 		Log:       quietLog(),
 		Customers: service.NewCustomerService(customers),
 		Locations: service.NewLocationService(locs),
-		Documents: service.NewBillingDocumentService(mocks.NewMockBillingDocumentRepository(t), locs),
+		Documents: service.NewBillingDocumentService(mocks.NewMockBillingDocumentRepository(t), locs, time.Now),
 	})
 	rec := sendAs(r, http.MethodPost, "/api/v1/invoices", body(t, func(_, item map[string]any) { item["unit_price_cents"] = 0 }))
 	assert.Equal(t, http.StatusNotFound, rec.Code, rec.Body.String())

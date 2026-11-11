@@ -3,6 +3,7 @@
 package billing_documents_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -73,6 +74,13 @@ func (w world) do(t *testing.T, method, path string, body any, want int) dto.Doc
 		return dto.DocumentResponse{}
 	}
 	return testapp.Decode[dto.DocumentResponse](t, rec)
+}
+
+func decodePage(t *testing.T, b []byte) []dto.DocumentResponse {
+	t.Helper()
+	var page dto.Page[dto.DocumentResponse]
+	require.NoError(t, json.Unmarshal(b, &page))
+	return page.Data
 }
 
 func docPath(prefix string, id int64, suffix string) string {
