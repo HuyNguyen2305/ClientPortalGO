@@ -34,3 +34,11 @@ func QueryInt64(c *gin.Context, name string) (*int64, error) {
 	}
 	return &n, nil
 }
+
+// bindJSON binds the body and reports any failure as a validation error.
+func bindJSON(c *gin.Context, dst any) error {
+	if err := c.ShouldBindJSON(dst); err != nil {
+		return fmt.Errorf("%w: %s", model.ErrValidation, err.Error())
+	}
+	return nil
+}

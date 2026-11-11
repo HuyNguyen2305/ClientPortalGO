@@ -9,13 +9,16 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"clientportal/internal/handler"
+	"clientportal/internal/repository"
+	"clientportal/internal/service"
 )
 
 // New returns the HTTP handler for the whole API.
 func New(pool *pgxpool.Pool, queryTimeout time.Duration, log *slog.Logger) http.Handler {
-	_ = queryTimeout // used by the repositories added in later tasks
+	customers := service.NewCustomerService(repository.NewCustomers(pool, queryTimeout))
 	return handler.NewRouter(handler.Deps{
-		Log:  log,
-		Ping: pool.Ping,
+		Log:       log,
+		Ping:      pool.Ping,
+		Customers: customers,
 	})
 }
