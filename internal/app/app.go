@@ -15,10 +15,10 @@ import (
 
 // New returns the HTTP handler for the whole API.
 func New(pool *pgxpool.Pool, queryTimeout time.Duration, log *slog.Logger) http.Handler {
-	customers := service.NewCustomerService(repository.NewCustomers(pool, queryTimeout))
 	return handler.NewRouter(handler.Deps{
 		Log:       log,
 		Ping:      pool.Ping,
-		Customers: customers,
+		Customers: service.NewCustomerService(repository.NewCustomers(pool, queryTimeout)),
+		Locations: service.NewLocationService(repository.NewLocations(pool, queryTimeout)),
 	})
 }

@@ -15,6 +15,7 @@ type Deps struct {
 	Log       *slog.Logger
 	Ping      func(context.Context) error
 	Customers *service.CustomerService
+	Locations *service.LocationService
 }
 
 // NewRouter builds the Gin engine with every route.
@@ -31,6 +32,19 @@ func NewRouter(d Deps) *gin.Engine {
 	api.GET("/customers/:id", customers.get)
 	api.PUT("/customers/:id", customers.update)
 	api.DELETE("/customers/:id", customers.delete)
+
+	// Everything below acts for the customer named in X-Customer-ID.
+	scoped := api.Group("", middleware.RequireCustomer(func(ctx context.Context, id int64) error {
+		_, err := d.Customers.Get(ctx, id)
+		return err
+	}, RespondError))
+
+	locations := locationHandler{svc: d.Locations}
+	scoped.POST("/locations", locations.create)
+	scoped.GET("/locations", locations.list)
+	scoped.GET("/locations/:id", locations.get)
+	scoped.PUT("/locations/:id", locations.update)
+	scoped.DELETE("/locations/:id", locations.delete)
 
 	return r
 }
