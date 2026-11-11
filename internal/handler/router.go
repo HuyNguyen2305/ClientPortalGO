@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"clientportal/internal/middleware"
+	"clientportal/internal/model"
 	"clientportal/internal/service"
 )
 
@@ -16,6 +17,7 @@ type Deps struct {
 	Ping      func(context.Context) error
 	Customers *service.CustomerService
 	Locations *service.LocationService
+	Documents *service.BillingDocumentService
 }
 
 // NewRouter builds the Gin engine with every route.
@@ -45,6 +47,17 @@ func NewRouter(d Deps) *gin.Engine {
 	scoped.GET("/locations/:id", locations.get)
 	scoped.PUT("/locations/:id", locations.update)
 	scoped.DELETE("/locations/:id", locations.delete)
+
+	// Invoices and estimates share one handler type, fixed to a parent type per route group.
+	for path, pt := range map[string]model.ParentType{"/invoices": model.ParentInvoice, "/estimates": model.ParentEstimate} {
+		h := NewBillingDocumentHandler(d.Documents, pt)
+		g := scoped.Group(path)
+		g.GET("", h.List)
+		g.POST("", h.Create)
+		g.GET("/:id", h.Get)
+		g.PUT("/:id", h.Update)
+		g.DELETE("/:id", h.Delete)
+	}
 
 	return r
 }

@@ -2,6 +2,7 @@
 package app
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"time"
@@ -15,10 +16,23 @@ import (
 
 // New returns the HTTP handler for the whole API.
 func New(pool *pgxpool.Pool, queryTimeout time.Duration, log *slog.Logger) http.Handler {
+	locations := repository.NewLocations(pool, queryTimeout)
+	documents := docRepo{repository.NewBillingDocuments(pool, queryTimeout)}
 	return handler.NewRouter(handler.Deps{
 		Log:       log,
 		Ping:      pool.Ping,
 		Customers: service.NewCustomerService(repository.NewCustomers(pool, queryTimeout)),
-		Locations: service.NewLocationService(repository.NewLocations(pool, queryTimeout)),
+		Locations: service.NewLocationService(locations),
+		Documents: service.NewBillingDocumentService(documents, locations),
+	})
+}
+
+// docRepo adapts the repository's WithTx to the service interface, so the repository
+// package never imports the service package.
+type docRepo struct{ *repository.BillingDocuments }
+
+func (r docRepo) WithTx(ctx context.Context, fn func(service.BillingDocumentRepository) error) error {
+	return r.BillingDocuments.WithTx(ctx, func(tx *repository.BillingDocuments) error {
+		return fn(docRepo{tx})
 	})
 }
