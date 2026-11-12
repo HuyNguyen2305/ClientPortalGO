@@ -18,6 +18,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"clientportal/internal/app"
+	"clientportal/internal/config"
+	"clientportal/internal/model"
 	"clientportal/tests/integration/testdb"
 )
 
@@ -27,13 +29,23 @@ type App struct {
 	Pool    *pgxpool.Pool
 }
 
+// Hours are the opening hours the test API runs with: 07:00 to 17:00 every day, a 15-minute
+// grid, 90 days ahead, Chicago time.
+var Hours = func() model.Hours {
+	loc, err := time.LoadLocation("America/Chicago")
+	if err != nil {
+		panic(err)
+	}
+	return model.Hours{Loc: loc, Open: 7 * 60, Close: 17 * 60, Step: 15, HorizonDays: 90}
+}()
+
 // New starts the API on a fresh, migrated database.
 func New(t *testing.T) *App {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	pool := testdb.New(t)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	return &App{Handler: app.New(pool, 5*time.Second, log), Pool: pool}
+	return &App{Handler: app.New(pool, config.Config{QueryTimeout: 5 * time.Second, Hours: Hours}, log), Pool: pool}
 }
 
 // Do sends a request. customerID 0 sends no X-Customer-ID header; body nil sends no body.

@@ -8,6 +8,7 @@ import (
 	"clientportal/internal/model"
 	"clientportal/internal/service"
 	"context"
+	"time"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -189,6 +190,137 @@ func (_c *MockBillingDocumentRepository_Balance_Call) RunAndReturn(run func(ctx 
 	return _c
 }
 
+// BusyIntervals provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) BusyIntervals(ctx context.Context, from time.Time, to time.Time) ([]model.Interval, error) {
+	ret := _mock.Called(ctx, from, to)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BusyIntervals")
+	}
+
+	var r0 []model.Interval
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, time.Time, time.Time) ([]model.Interval, error)); ok {
+		return returnFunc(ctx, from, to)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, time.Time, time.Time) []model.Interval); ok {
+		r0 = returnFunc(ctx, from, to)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]model.Interval)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, time.Time, time.Time) error); ok {
+		r1 = returnFunc(ctx, from, to)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBillingDocumentRepository_BusyIntervals_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BusyIntervals'
+type MockBillingDocumentRepository_BusyIntervals_Call struct {
+	*mock.Call
+}
+
+// BusyIntervals is a helper method to define mock.On call
+//   - ctx context.Context
+//   - from time.Time
+//   - to time.Time
+func (_e *MockBillingDocumentRepository_Expecter) BusyIntervals(ctx any, from any, to any) *MockBillingDocumentRepository_BusyIntervals_Call {
+	return &MockBillingDocumentRepository_BusyIntervals_Call{Call: _e.mock.On("BusyIntervals", ctx, from, to)}
+}
+
+func (_c *MockBillingDocumentRepository_BusyIntervals_Call) Run(run func(ctx context.Context, from time.Time, to time.Time)) *MockBillingDocumentRepository_BusyIntervals_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 time.Time
+		if args[1] != nil {
+			arg1 = args[1].(time.Time)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_BusyIntervals_Call) Return(intervals []model.Interval, err error) *MockBillingDocumentRepository_BusyIntervals_Call {
+	_c.Call.Return(intervals, err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_BusyIntervals_Call) RunAndReturn(run func(ctx context.Context, from time.Time, to time.Time) ([]model.Interval, error)) *MockBillingDocumentRepository_BusyIntervals_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CancelBookingForEstimate provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) CancelBookingForEstimate(ctx context.Context, estimateID int64) error {
+	ret := _mock.Called(ctx, estimateID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CancelBookingForEstimate")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = returnFunc(ctx, estimateID)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockBillingDocumentRepository_CancelBookingForEstimate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CancelBookingForEstimate'
+type MockBillingDocumentRepository_CancelBookingForEstimate_Call struct {
+	*mock.Call
+}
+
+// CancelBookingForEstimate is a helper method to define mock.On call
+//   - ctx context.Context
+//   - estimateID int64
+func (_e *MockBillingDocumentRepository_Expecter) CancelBookingForEstimate(ctx any, estimateID any) *MockBillingDocumentRepository_CancelBookingForEstimate_Call {
+	return &MockBillingDocumentRepository_CancelBookingForEstimate_Call{Call: _e.mock.On("CancelBookingForEstimate", ctx, estimateID)}
+}
+
+func (_c *MockBillingDocumentRepository_CancelBookingForEstimate_Call) Run(run func(ctx context.Context, estimateID int64)) *MockBillingDocumentRepository_CancelBookingForEstimate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_CancelBookingForEstimate_Call) Return(err error) *MockBillingDocumentRepository_CancelBookingForEstimate_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_CancelBookingForEstimate_Call) RunAndReturn(run func(ctx context.Context, estimateID int64) error) *MockBillingDocumentRepository_CancelBookingForEstimate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Create provides a mock function for the type MockBillingDocumentRepository
 func (_mock *MockBillingDocumentRepository) Create(ctx context.Context, d model.BillingDocument) (int64, error) {
 	ret := _mock.Called(ctx, d)
@@ -251,6 +383,72 @@ func (_c *MockBillingDocumentRepository_Create_Call) Return(n int64, err error) 
 }
 
 func (_c *MockBillingDocumentRepository_Create_Call) RunAndReturn(run func(ctx context.Context, d model.BillingDocument) (int64, error)) *MockBillingDocumentRepository_Create_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CreateBooking provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) CreateBooking(ctx context.Context, b model.Booking) (int64, error) {
+	ret := _mock.Called(ctx, b)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateBooking")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, model.Booking) (int64, error)); ok {
+		return returnFunc(ctx, b)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, model.Booking) int64); ok {
+		r0 = returnFunc(ctx, b)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, model.Booking) error); ok {
+		r1 = returnFunc(ctx, b)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBillingDocumentRepository_CreateBooking_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateBooking'
+type MockBillingDocumentRepository_CreateBooking_Call struct {
+	*mock.Call
+}
+
+// CreateBooking is a helper method to define mock.On call
+//   - ctx context.Context
+//   - b model.Booking
+func (_e *MockBillingDocumentRepository_Expecter) CreateBooking(ctx any, b any) *MockBillingDocumentRepository_CreateBooking_Call {
+	return &MockBillingDocumentRepository_CreateBooking_Call{Call: _e.mock.On("CreateBooking", ctx, b)}
+}
+
+func (_c *MockBillingDocumentRepository_CreateBooking_Call) Run(run func(ctx context.Context, b model.Booking)) *MockBillingDocumentRepository_CreateBooking_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 model.Booking
+		if args[1] != nil {
+			arg1 = args[1].(model.Booking)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_CreateBooking_Call) Return(n int64, err error) *MockBillingDocumentRepository_CreateBooking_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_CreateBooking_Call) RunAndReturn(run func(ctx context.Context, b model.Booking) (int64, error)) *MockBillingDocumentRepository_CreateBooking_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -386,6 +584,78 @@ func (_c *MockBillingDocumentRepository_Get_Call) Return(billingDocument model.B
 }
 
 func (_c *MockBillingDocumentRepository_Get_Call) RunAndReturn(run func(ctx context.Context, customerID int64, pt model.ParentType, id int64) (model.BillingDocument, error)) *MockBillingDocumentRepository_Get_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetBooking provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) GetBooking(ctx context.Context, customerID int64, id int64) (model.Booking, error) {
+	ret := _mock.Called(ctx, customerID, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetBooking")
+	}
+
+	var r0 model.Booking
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64) (model.Booking, error)); ok {
+		return returnFunc(ctx, customerID, id)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64) model.Booking); ok {
+		r0 = returnFunc(ctx, customerID, id)
+	} else {
+		r0 = ret.Get(0).(model.Booking)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64, int64) error); ok {
+		r1 = returnFunc(ctx, customerID, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBillingDocumentRepository_GetBooking_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetBooking'
+type MockBillingDocumentRepository_GetBooking_Call struct {
+	*mock.Call
+}
+
+// GetBooking is a helper method to define mock.On call
+//   - ctx context.Context
+//   - customerID int64
+//   - id int64
+func (_e *MockBillingDocumentRepository_Expecter) GetBooking(ctx any, customerID any, id any) *MockBillingDocumentRepository_GetBooking_Call {
+	return &MockBillingDocumentRepository_GetBooking_Call{Call: _e.mock.On("GetBooking", ctx, customerID, id)}
+}
+
+func (_c *MockBillingDocumentRepository_GetBooking_Call) Run(run func(ctx context.Context, customerID int64, id int64)) *MockBillingDocumentRepository_GetBooking_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_GetBooking_Call) Return(booking model.Booking, err error) *MockBillingDocumentRepository_GetBooking_Call {
+	_c.Call.Return(booking, err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_GetBooking_Call) RunAndReturn(run func(ctx context.Context, customerID int64, id int64) (model.Booking, error)) *MockBillingDocumentRepository_GetBooking_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -668,6 +938,80 @@ func (_c *MockBillingDocumentRepository_ListPayments_Call) Return(payments []mod
 }
 
 func (_c *MockBillingDocumentRepository_ListPayments_Call) RunAndReturn(run func(ctx context.Context, documentID int64) ([]model.Payment, error)) *MockBillingDocumentRepository_ListPayments_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListUpcoming provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) ListUpcoming(ctx context.Context, customerID int64, now time.Time) ([]model.Booking, error) {
+	ret := _mock.Called(ctx, customerID, now)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListUpcoming")
+	}
+
+	var r0 []model.Booking
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, time.Time) ([]model.Booking, error)); ok {
+		return returnFunc(ctx, customerID, now)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, time.Time) []model.Booking); ok {
+		r0 = returnFunc(ctx, customerID, now)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]model.Booking)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64, time.Time) error); ok {
+		r1 = returnFunc(ctx, customerID, now)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBillingDocumentRepository_ListUpcoming_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListUpcoming'
+type MockBillingDocumentRepository_ListUpcoming_Call struct {
+	*mock.Call
+}
+
+// ListUpcoming is a helper method to define mock.On call
+//   - ctx context.Context
+//   - customerID int64
+//   - now time.Time
+func (_e *MockBillingDocumentRepository_Expecter) ListUpcoming(ctx any, customerID any, now any) *MockBillingDocumentRepository_ListUpcoming_Call {
+	return &MockBillingDocumentRepository_ListUpcoming_Call{Call: _e.mock.On("ListUpcoming", ctx, customerID, now)}
+}
+
+func (_c *MockBillingDocumentRepository_ListUpcoming_Call) Run(run func(ctx context.Context, customerID int64, now time.Time)) *MockBillingDocumentRepository_ListUpcoming_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_ListUpcoming_Call) Return(bookings []model.Booking, err error) *MockBillingDocumentRepository_ListUpcoming_Call {
+	_c.Call.Return(bookings, err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_ListUpcoming_Call) RunAndReturn(run func(ctx context.Context, customerID int64, now time.Time) ([]model.Booking, error)) *MockBillingDocumentRepository_ListUpcoming_Call {
 	_c.Call.Return(run)
 	return _c
 }

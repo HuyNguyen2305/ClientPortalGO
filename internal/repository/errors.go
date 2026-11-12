@@ -23,6 +23,8 @@ func mapErr(err error) error {
 			return fmt.Errorf("%w: record is still referenced", model.ErrConflict)
 		case "23505": // unique_violation
 			return fmt.Errorf("%w: record already exists", model.ErrConflict)
+		case "23P01": // exclusion_violation: only bookings_no_overlap today
+			return fmt.Errorf("%w: that time slot is no longer available", model.ErrConflict)
 		}
 	}
 	return err

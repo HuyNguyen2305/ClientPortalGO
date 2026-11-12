@@ -18,6 +18,8 @@ type Deps struct {
 	Customers *service.CustomerService
 	Locations *service.LocationService
 	Documents *service.BillingDocumentService
+	Catalog   *service.Catalog
+	Bookings  *service.BookingService
 }
 
 // NewRouter builds the Gin engine with every route.
@@ -34,6 +36,13 @@ func NewRouter(d Deps) *gin.Engine {
 	api.GET("/customers/:id", customers.get)
 	api.PUT("/customers/:id", customers.update)
 	api.DELETE("/customers/:id", customers.delete)
+
+	services := serviceHandler{svc: d.Catalog}
+	api.GET("/services", services.list)
+	api.GET("/services/:id", services.get)
+	api.POST("/services", services.create)
+	api.PUT("/services/:id", services.update)
+	api.DELETE("/services/:id", services.delete)
 
 	// Everything below acts for the customer named in X-Customer-ID.
 	scoped := api.Group("", middleware.RequireCustomer(func(ctx context.Context, id int64) error {
@@ -71,6 +80,13 @@ func NewRouter(d Deps) *gin.Engine {
 	estimates.POST("/:id/accept", est.Transition(model.StatusAccepted))
 	estimates.POST("/:id/decline", est.Transition(model.StatusDeclined))
 	estimates.POST("/:id/convert", est.Convert)
+
+	bookings := bookingHandler{svc: d.Bookings}
+	scoped.GET("/booking/days", bookings.days)
+	scoped.GET("/services/:id/slots", bookings.slots)
+	scoped.POST("/bookings", bookings.create)
+	scoped.GET("/bookings", bookings.list)
+	scoped.GET("/bookings/:id", bookings.get)
 
 	return r
 }

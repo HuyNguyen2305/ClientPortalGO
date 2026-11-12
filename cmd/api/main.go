@@ -49,7 +49,7 @@ func run(log *slog.Logger) error {
 	gin.SetMode(gin.ReleaseMode)
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           app.New(pool, cfg.QueryTimeout, log),
+		Handler:           app.New(pool, cfg, log),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
