@@ -20,13 +20,15 @@ func New(pool *pgxpool.Pool, cfg config.Config, log *slog.Logger) http.Handler {
 	queryTimeout := cfg.QueryTimeout
 	locations := repository.NewLocations(pool, queryTimeout)
 	documents := docRepo{repository.NewBillingDocuments(pool, queryTimeout)}
+	services := repository.NewServices(pool, queryTimeout)
 	return handler.NewRouter(handler.Deps{
 		Log:       log,
 		Ping:      pool.Ping,
 		Customers: service.NewCustomerService(repository.NewCustomers(pool, queryTimeout)),
 		Locations: service.NewLocationService(locations),
 		Documents: service.NewBillingDocumentService(documents, locations, time.Now),
-		Catalog:   service.NewCatalog(repository.NewServices(pool, queryTimeout)),
+		Catalog:   service.NewCatalog(services),
+		Bookings:  service.NewBookingService(documents, locations, services, cfg.Hours, time.Now),
 	})
 }
 

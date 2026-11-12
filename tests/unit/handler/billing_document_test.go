@@ -24,11 +24,15 @@ func docRouter(t *testing.T) http.Handler {
 	customers.EXPECT().Get(mock.Anything, int64(1)).Return(model.Customer{ID: 1}, nil).Maybe()
 	locs := mocks.NewMockLocationRepository(t)
 	docs := mocks.NewMockBillingDocumentRepository(t)
+	services := mocks.NewMockServiceRepository(t)
+	hours := model.Hours{Loc: time.UTC, Open: 7 * 60, Close: 17 * 60, Step: 15, HorizonDays: 90}
 	return handler.NewRouter(handler.Deps{
 		Log:       quietLog(),
 		Customers: service.NewCustomerService(customers),
 		Locations: service.NewLocationService(locs),
 		Documents: service.NewBillingDocumentService(docs, locs, time.Now),
+		Catalog:   service.NewCatalog(services),
+		Bookings:  service.NewBookingService(docs, locs, services, hours, time.Now),
 	})
 }
 

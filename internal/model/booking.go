@@ -17,6 +17,14 @@ type Booking struct {
 	CancelledAt *time.Time
 }
 
+// BookingInput is a customer's booking request; Date and Time are business-local.
+type BookingInput struct {
+	ServiceID  int64
+	LocationID int64
+	Date       string // YYYY-MM-DD
+	Time       string // HH:MM
+}
+
 // Interval is a busy stretch of time, half-open: [Start, End).
 type Interval struct {
 	Start, End time.Time
@@ -51,7 +59,8 @@ func (h Hours) BookableRange(now time.Time) (first, last time.Time) {
 	return civil(y, m, d+1), civil(y, m, d+h.HorizonDays)
 }
 
-func (h Hours) checkBookable(now, day time.Time) error {
+// CheckBookable fails with ErrValidation unless day is inside BookableRange(now).
+func (h Hours) CheckBookable(now, day time.Time) error {
 	first, last := h.BookableRange(now)
 	if day.Before(first) || day.After(last) {
 		return fmt.Errorf("%w: bookable dates are %s to %s", ErrValidation,
@@ -63,7 +72,7 @@ func (h Hours) checkBookable(now, day time.Time) error {
 // Days returns up to seven bookable dates from `from`, and the `from` of the previous and
 // next pages (nil at the edges of the bookable range).
 func (h Hours) Days(now, from time.Time) (days []time.Time, prev, next *time.Time, err error) {
-	if err := h.checkBookable(now, from); err != nil {
+	if err := h.CheckBookable(now, from); err != nil {
 		return nil, nil, nil, err
 	}
 	first, last := h.BookableRange(now)
@@ -101,7 +110,7 @@ func (h Hours) ParseSlot(now time.Time, dateStr, timeStr string, durationMin int
 	if err != nil {
 		return time.Time{}, err
 	}
-	if err := h.checkBookable(now, day); err != nil {
+	if err := h.CheckBookable(now, day); err != nil {
 		return time.Time{}, err
 	}
 	t, err := time.Parse("15:04", timeStr)

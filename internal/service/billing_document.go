@@ -33,6 +33,18 @@ type BillingDocumentRepository interface {
 	ListPayments(ctx context.Context, documentID int64) ([]model.Payment, error)
 	// Balance sums the balance due over the customer's open and partially paid invoices.
 	Balance(ctx context.Context, customerID int64, locationID *int64) (int64, error)
+
+	// Bookings live here because each is written in the same transaction as its estimate.
+
+	// CreateBooking inserts a booking; an overlap with a live booking is ErrConflict.
+	CreateBooking(ctx context.Context, b model.Booking) (int64, error)
+	// CancelBookingForEstimate cancels the live booking that created the estimate, if any.
+	CancelBookingForEstimate(ctx context.Context, estimateID int64) error
+	// BusyIntervals returns every live booking overlapping [from, to), for any customer.
+	BusyIntervals(ctx context.Context, from, to time.Time) ([]model.Interval, error)
+	GetBooking(ctx context.Context, customerID, id int64) (model.Booking, error)
+	// ListUpcoming returns the customer's live bookings that end after now, soonest first.
+	ListUpcoming(ctx context.Context, customerID int64, now time.Time) ([]model.Booking, error)
 }
 
 // BillingDocumentService manages invoices and estimates.
@@ -172,7 +184,14 @@ func (s *BillingDocumentService) Transition(ctx context.Context, customerID int6
 		if !model.CanTransition(pt, doc.Status, to) {
 			return fmt.Errorf("%w: %s %d cannot move from %s to %s", model.ErrConflict, pt, doc.Number, doc.Status, to)
 		}
-		return tx.UpdateStatus(ctx, id, to)
+		if err := tx.UpdateStatus(ctx, id, to); err != nil {
+			return err
+		}
+		// Declining the estimate a booking created cancels the visit and frees its slot.
+		if pt == model.ParentEstimate && to == model.StatusDeclined {
+			return tx.CancelBookingForEstimate(ctx, id)
+		}
+		return nil
 	})
 	if err != nil {
 		return model.BillingDocument{}, fmt.Errorf("%s %s: %w", to, pt, err)
