@@ -23,7 +23,7 @@ func TestServiceHandler_RejectsBadInput(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := handler.NewRouter(handler.Deps{Log: quietLog(), Catalog: service.NewCatalog(mocks.NewMockServiceRepository(t))})
+			r := handler.NewRouter(handler.Deps{Log: quietLog(), AdminKey: testAdminKey, Catalog: service.NewCatalog(mocks.NewMockServiceRepository(t))})
 			rec := send(r, tt.method, tt.path, tt.body)
 			assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 		})

@@ -1,10 +1,13 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 
 	"clientportal/internal/model"
 )
@@ -35,10 +38,24 @@ func QueryInt64(c *gin.Context, name string) (*int64, error) {
 	return &n, nil
 }
 
+// maxBodyBytes caps a request body; the largest real one is a 100-item document.
+const maxBodyBytes = 1 << 20
+
 // bindJSON binds the body and reports any failure as a validation error.
+// shortcut: an oversized body is a 400, not a 413; change it when a client needs the distinction.
 func bindJSON(c *gin.Context, dst any) error {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBodyBytes)
 	if err := c.ShouldBindJSON(dst); err != nil {
-		return fmt.Errorf("%w: %s", model.ErrValidation, err.Error())
+		return fmt.Errorf("%w: %s", model.ErrValidation, bindMessage(err))
 	}
 	return nil
+}
+
+// bindMessage describes the first failed rule without the validator's internal struct path.
+func bindMessage(err error) string {
+	var ve validator.ValidationErrors
+	if errors.As(err, &ve) && len(ve) > 0 {
+		return fmt.Sprintf("%s failed the %q rule", ve[0].Field(), ve[0].Tag())
+	}
+	return "body is not valid JSON of the expected shape"
 }

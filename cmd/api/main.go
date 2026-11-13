@@ -51,6 +51,9 @@ func run(log *slog.Logger) error {
 		Addr:              ":" + cfg.Port,
 		Handler:           app.New(pool, cfg, log),
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	errCh := make(chan error, 1)

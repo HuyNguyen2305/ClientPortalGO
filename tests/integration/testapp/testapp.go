@@ -45,11 +45,21 @@ func New(t *testing.T) *App {
 	gin.SetMode(gin.TestMode)
 	pool := testdb.New(t)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	return &App{Handler: app.New(pool, config.Config{QueryTimeout: 5 * time.Second, Hours: Hours}, log), Pool: pool}
+	cfg := config.Config{AdminAPIKey: AdminKey, QueryTimeout: 5 * time.Second, Hours: Hours, MaxLiveBookings: 3}
+	return &App{Handler: app.New(pool, cfg, log), Pool: pool}
 }
+
+// AdminKey is the X-Admin-Key the test API accepts; Do sends it on every request.
+const AdminKey = "test-admin-key"
 
 // Do sends a request. customerID 0 sends no X-Customer-ID header; body nil sends no body.
 func (a *App) Do(t *testing.T, method, path string, customerID int64, body any) *httptest.ResponseRecorder {
+	t.Helper()
+	return a.DoWith(t, method, path, customerID, body, nil)
+}
+
+// DoWith is Do plus extra request headers.
+func (a *App) DoWith(t *testing.T, method, path string, customerID int64, body any, headers map[string]string) *httptest.ResponseRecorder {
 	t.Helper()
 	var r io.Reader
 	if body != nil {
@@ -66,6 +76,10 @@ func (a *App) Do(t *testing.T, method, path string, customerID int64, body any) 
 	req := httptest.NewRequest(method, path, r)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	req.Header.Set("X-Admin-Key", AdminKey)
+	for k, v := range headers {
+		req.Header.Set(k, v)
 	}
 	if customerID != 0 {
 		req.Header.Set("X-Customer-ID", strconv.FormatInt(customerID, 10))

@@ -14,6 +14,7 @@ import (
 // Deps is everything the router needs.
 type Deps struct {
 	Log       *slog.Logger
+	AdminKey  string
 	Ping      func(context.Context) error
 	Customers *service.CustomerService
 	Locations *service.LocationService
@@ -30,19 +31,22 @@ func NewRouter(d Deps) *gin.Engine {
 
 	api := r.Group("/api/v1")
 
+	// Admin routes need X-Admin-Key; the service catalog stays readable by customers.
+	admin := api.Group("", middleware.RequireAdminKey(d.AdminKey, RespondError))
+
 	customers := customerHandler{svc: d.Customers}
-	api.POST("/customers", customers.create)
-	api.GET("/customers", customers.list)
-	api.GET("/customers/:id", customers.get)
-	api.PUT("/customers/:id", customers.update)
-	api.DELETE("/customers/:id", customers.delete)
+	admin.POST("/customers", customers.create)
+	admin.GET("/customers", customers.list)
+	admin.GET("/customers/:id", customers.get)
+	admin.PUT("/customers/:id", customers.update)
+	admin.DELETE("/customers/:id", customers.delete)
 
 	services := serviceHandler{svc: d.Catalog}
 	api.GET("/services", services.list)
 	api.GET("/services/:id", services.get)
-	api.POST("/services", services.create)
-	api.PUT("/services/:id", services.update)
-	api.DELETE("/services/:id", services.delete)
+	admin.POST("/services", services.create)
+	admin.PUT("/services/:id", services.update)
+	admin.DELETE("/services/:id", services.delete)
 
 	// Everything below acts for the customer named in X-Customer-ID.
 	scoped := api.Group("", middleware.RequireCustomer(func(ctx context.Context, id int64) error {
@@ -87,6 +91,7 @@ func NewRouter(d Deps) *gin.Engine {
 	scoped.POST("/bookings", bookings.create)
 	scoped.GET("/bookings", bookings.list)
 	scoped.GET("/bookings/:id", bookings.get)
+	scoped.POST("/bookings/:id/cancel", bookings.cancel)
 
 	return r
 }

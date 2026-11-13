@@ -31,6 +31,11 @@ func TestInvoiceTransitions(t *testing.T) {
 		assert.Equal(t, "void", w.do(t, http.MethodPost, docPath("invoices", d.ID, "/void"), nil, http.StatusOK).Status)
 	})
 
+	t.Run("a $0 invoice cannot be sent", func(t *testing.T) {
+		d := w.create(t, "invoices", "2026-12-14", item("Free visit", 1, 0))
+		w.do(t, http.MethodPost, docPath("invoices", d.ID, "/send"), nil, http.StatusConflict)
+	})
+
 	t.Run("another customer", func(t *testing.T) {
 		d := w.create(t, "invoices", "2026-12-12")
 		b, _ := newCustomer(t, w.app, "B")

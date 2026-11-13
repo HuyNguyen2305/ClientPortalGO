@@ -32,7 +32,7 @@ func docRouter(t *testing.T) http.Handler {
 		Locations: service.NewLocationService(locs),
 		Documents: service.NewBillingDocumentService(docs, locs, time.Now),
 		Catalog:   service.NewCatalog(services),
-		Bookings:  service.NewBookingService(docs, locs, services, hours, time.Now),
+		Bookings:  service.NewBookingService(docs, locs, services, hours, 3, time.Now),
 	})
 }
 
@@ -95,6 +95,16 @@ func TestBillingDocumentHandler_RejectsBadBodies(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestPaymentHandler_RejectsOverlongIdempotencyKey(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/invoices/9/payments", strings.NewReader(`{"amount_cents":100}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Customer-ID", "1")
+	req.Header.Set("Idempotency-Key", strings.Repeat("k", 256))
+	rec := httptest.NewRecorder()
+	docRouter(t).ServeHTTP(rec, req) // the mocks fail the test if a repository is called
+	assert.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
 }
 
 func TestBillingDocumentHandler_AcceptsZeroUnitPrice(t *testing.T) {

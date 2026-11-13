@@ -93,6 +93,9 @@ func (h Hours) Days(now, from time.Time) (days []time.Time, prev, next *time.Tim
 }
 
 // at is the absolute time of `minutes` after midnight on `day`, in the business timezone.
+// shortcut: a wall-clock time that a DST change skips or repeats (hours spanning about 02:00) is
+// normalised by time.Date and shifts that slot; the default 07:00-17:00 never hits it, so validate
+// the hours at startup if they are ever configured around the change.
 func (h Hours) at(day time.Time, minutes int) time.Time {
 	y, m, d := day.Date()
 	return time.Date(y, m, d, minutes/60, minutes%60, 0, 0, h.Loc)

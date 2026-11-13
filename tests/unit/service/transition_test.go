@@ -17,7 +17,7 @@ func TestTransition(t *testing.T) {
 	t.Run("draft invoice is sent", func(t *testing.T) {
 		f := newDocFixture(t)
 		f.docs.EXPECT().GetForUpdate(mock.Anything, custID, model.ParentInvoice, int64(9)).
-			Return(model.BillingDocument{ID: 9, Status: model.StatusDraft}, nil)
+			Return(model.BillingDocument{ID: 9, Status: model.StatusDraft, TotalCents: 100}, nil)
 		f.docs.EXPECT().UpdateStatus(mock.Anything, int64(9), model.StatusOpen).Return(nil).Once()
 		f.docs.EXPECT().Get(mock.Anything, custID, model.ParentInvoice, int64(9)).
 			Return(model.BillingDocument{ID: 9, Status: model.StatusOpen}, nil)
@@ -26,6 +26,22 @@ func TestTransition(t *testing.T) {
 		got, err := f.svc.Transition(context.Background(), custID, model.ParentInvoice, 9, model.StatusOpen)
 		require.NoError(t, err)
 		assert.Equal(t, model.StatusOpen, got.Status)
+	})
+
+	t.Run("$0 invoice cannot be sent, a $0 estimate can", func(t *testing.T) {
+		f := newDocFixture(t)
+		f.docs.EXPECT().GetForUpdate(mock.Anything, custID, model.ParentInvoice, int64(9)).
+			Return(model.BillingDocument{ID: 9, Status: model.StatusDraft}, nil)
+		_, err := f.svc.Transition(context.Background(), custID, model.ParentInvoice, 9, model.StatusOpen)
+		assert.True(t, errors.Is(err, model.ErrConflict), "got %v", err)
+
+		f.docs.EXPECT().GetForUpdate(mock.Anything, custID, model.ParentEstimate, int64(4)).
+			Return(model.BillingDocument{ID: 4, Status: model.StatusDraft}, nil)
+		f.docs.EXPECT().UpdateStatus(mock.Anything, int64(4), model.StatusOpen).Return(nil).Once()
+		f.docs.EXPECT().Get(mock.Anything, custID, model.ParentEstimate, int64(4)).Return(model.BillingDocument{ID: 4}, nil)
+		f.docs.EXPECT().ListItems(mock.Anything, int64(4)).Return(nil, nil)
+		_, err = f.svc.Transition(context.Background(), custID, model.ParentEstimate, 4, model.StatusOpen)
+		require.NoError(t, err)
 	})
 
 	t.Run("paid invoice cannot be voided", func(t *testing.T) {

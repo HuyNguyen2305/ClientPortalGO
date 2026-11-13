@@ -15,6 +15,7 @@ func TestBookingHandler_RejectsBadInput(t *testing.T) {
 		{"date missing", http.MethodPost, "/api/v1/bookings", `{"service_id":2,"location_id":7,"time":"07:00"}`},
 		{"time missing", http.MethodPost, "/api/v1/bookings", `{"service_id":2,"location_id":7,"date":"2026-11-12"}`},
 		{"bad booking id", http.MethodGet, "/api/v1/bookings/abc", ""},
+		{"bad cancel id", http.MethodPost, "/api/v1/bookings/0/cancel", ""},
 		{"bad days from", http.MethodGet, "/api/v1/booking/days?from=soon", ""},
 		{"bad slots service id", http.MethodGet, "/api/v1/services/abc/slots?date=2026-11-12", ""},
 	}

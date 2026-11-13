@@ -13,6 +13,7 @@ import (
 )
 
 // numberSequences maps each parent type to the sequence its display numbers come from.
+// Sequences never roll back, so a failed insert leaves a gap in the numbers.
 var numberSequences = map[model.ParentType]string{
 	model.ParentInvoice:  "invoice_number_seq",
 	model.ParentEstimate: "estimate_number_seq",

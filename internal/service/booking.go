@@ -15,13 +15,14 @@ type BookingService struct {
 	locs     LocationRepository
 	services ServiceRepository
 	hours    model.Hours
+	maxLive  int // upcoming live bookings one customer may hold
 	now      func() time.Time
 }
 
-// NewBookingService returns a booking service.
+// NewBookingService returns a booking service; a customer may hold at most maxLive upcoming bookings.
 func NewBookingService(docs BillingDocumentRepository, locs LocationRepository, services ServiceRepository,
-	hours model.Hours, now func() time.Time) *BookingService {
-	return &BookingService{docs: docs, locs: locs, services: services, hours: hours, now: now}
+	hours model.Hours, maxLive int, now func() time.Time) *BookingService {
+	return &BookingService{docs: docs, locs: locs, services: services, hours: hours, maxLive: maxLive, now: now}
 }
 
 // Location is the business timezone; responses show booked times in it.
@@ -78,6 +79,15 @@ func (s *BookingService) Book(ctx context.Context, customerID int64, in model.Bo
 	if err != nil {
 		return model.Booking{}, err
 	}
+	// shortcut: concurrent requests from one customer can pass this check together and exceed the
+	// cap by the number in flight; lock the customer row here if that ever matters.
+	live, err := s.docs.ListUpcoming(ctx, customerID, s.now())
+	if err != nil {
+		return model.Booking{}, fmt.Errorf("book: %w", err)
+	}
+	if len(live) >= s.maxLive {
+		return model.Booking{}, fmt.Errorf("%w: you already have %d upcoming bookings; cancel one first", model.ErrConflict, len(live))
+	}
 
 	var id int64
 	err = s.docs.WithTx(ctx, func(tx BillingDocumentRepository) error {
@@ -107,6 +117,44 @@ func (s *BookingService) Book(ctx context.Context, customerID int64, in model.Bo
 	})
 	if err != nil {
 		return model.Booking{}, fmt.Errorf("book: %w", err)
+	}
+	return s.Get(ctx, customerID, id)
+}
+
+// Cancel cancels one of the customer's live bookings and declines its estimate, freeing the slot.
+// It works while the estimate is open or accepted, but not once it became an invoice. The status
+// is set directly: the public /decline transition keeps `accepted` terminal.
+func (s *BookingService) Cancel(ctx context.Context, customerID, id int64) (model.Booking, error) {
+	err := s.docs.WithTx(ctx, func(tx BillingDocumentRepository) error {
+		b, err := tx.GetBooking(ctx, customerID, id)
+		if err != nil {
+			return err
+		}
+		if b.CancelledAt != nil {
+			return fmt.Errorf("%w: booking %d is already cancelled", model.ErrConflict, id)
+		}
+		// Lock the estimate first: Convert holds the same lock, so it cannot slip in after the check below.
+		est, err := tx.GetForUpdate(ctx, customerID, model.ParentEstimate, b.Estimate.ID)
+		if err != nil {
+			return err
+		}
+		if est.Status != model.StatusOpen && est.Status != model.StatusAccepted {
+			return fmt.Errorf("%w: estimate %d is %s and cannot be cancelled", model.ErrConflict, est.Number, est.Status)
+		}
+		converted, err := tx.HasConvertedInvoice(ctx, est.ID)
+		if err != nil {
+			return err
+		}
+		if converted {
+			return fmt.Errorf("%w: estimate %d already became an invoice", model.ErrConflict, est.Number)
+		}
+		if err := tx.UpdateStatus(ctx, est.ID, model.StatusDeclined); err != nil {
+			return err
+		}
+		return tx.CancelBookingForEstimate(ctx, est.ID)
+	})
+	if err != nil {
+		return model.Booking{}, fmt.Errorf("cancel booking: %w", err)
 	}
 	return s.Get(ctx, customerID, id)
 }

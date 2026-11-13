@@ -28,8 +28,11 @@ type BillingDocumentRepository interface {
 	Update(ctx context.Context, d model.BillingDocument) error
 	Delete(ctx context.Context, id int64) error
 	UpdateStatus(ctx context.Context, id int64, status model.Status) error
-	// AddPayment records a payment and moves amount_paid_cents and status with it.
-	AddPayment(ctx context.Context, documentID, amountCents int64, newStatus model.Status) error
+	// AddPayment records a payment and moves amount_paid_cents and status with it. An empty
+	// idempotencyKey stores none.
+	AddPayment(ctx context.Context, documentID, amountCents int64, newStatus model.Status, idempotencyKey string) error
+	// HasPaymentKey reports whether the invoice already has a payment recorded under the key.
+	HasPaymentKey(ctx context.Context, documentID int64, key string) (bool, error)
 	ListPayments(ctx context.Context, documentID int64) ([]model.Payment, error)
 	// Balance sums the balance due over the customer's open and partially paid invoices.
 	Balance(ctx context.Context, customerID int64, locationID *int64) (int64, error)
@@ -43,6 +46,8 @@ type BillingDocumentRepository interface {
 	// BusyIntervals returns every live booking overlapping [from, to), for any customer.
 	BusyIntervals(ctx context.Context, from, to time.Time) ([]model.Interval, error)
 	GetBooking(ctx context.Context, customerID, id int64) (model.Booking, error)
+	// HasConvertedInvoice reports whether an invoice was created from the estimate.
+	HasConvertedInvoice(ctx context.Context, estimateID int64) (bool, error)
 	// ListUpcoming returns the customer's live bookings that end after now, soonest first.
 	ListUpcoming(ctx context.Context, customerID int64, now time.Time) ([]model.Booking, error)
 }
@@ -127,6 +132,9 @@ func (s *BillingDocumentService) List(ctx context.Context, f model.DocumentFilte
 		return nil, nil, fmt.Errorf("%w: unknown %s status %q", model.ErrValidation, f.ParentType, *f.Status)
 	}
 	limit := f.Limit
+	if limit < 1 {
+		return nil, nil, fmt.Errorf("%w: limit must be at least 1", model.ErrValidation)
+	}
 	f.Limit = limit + 1
 	docs, err := s.docs.List(ctx, f)
 	if err != nil {
@@ -184,6 +192,10 @@ func (s *BillingDocumentService) Transition(ctx context.Context, customerID int6
 		if !model.CanTransition(pt, doc.Status, to) {
 			return fmt.Errorf("%w: %s %d cannot move from %s to %s", model.ErrConflict, pt, doc.Number, doc.Status, to)
 		}
+		// A $0 invoice could never be paid, so it would sit open until voided.
+		if pt == model.ParentInvoice && to == model.StatusOpen && doc.TotalCents == 0 {
+			return fmt.Errorf("%w: invoice %d has a $0 total and cannot be sent", model.ErrConflict, doc.Number)
+		}
 		if err := tx.UpdateStatus(ctx, id, to); err != nil {
 			return err
 		}
@@ -201,11 +213,19 @@ func (s *BillingDocumentService) Transition(ctx context.Context, customerID int6
 
 // RecordPayment applies a payment to an open or partially paid invoice. The invoice row is
 // locked for the whole transaction, so two concurrent payments cannot overpay it.
-func (s *BillingDocumentService) RecordPayment(ctx context.Context, customerID, invoiceID, amountCents int64) (model.BillingDocument, error) {
+// A non-empty idempotencyKey makes a retry a no-op: the invoice comes back unchanged, whatever
+// amount the retry carried.
+func (s *BillingDocumentService) RecordPayment(ctx context.Context, customerID, invoiceID, amountCents int64, idempotencyKey string) (model.BillingDocument, error) {
 	err := s.docs.WithTx(ctx, func(tx BillingDocumentRepository) error {
 		doc, err := tx.GetForUpdate(ctx, customerID, model.ParentInvoice, invoiceID)
 		if err != nil {
 			return err
+		}
+		if idempotencyKey != "" {
+			seen, err := tx.HasPaymentKey(ctx, invoiceID, idempotencyKey)
+			if err != nil || seen {
+				return err
+			}
 		}
 		if amountCents > doc.BalanceDueCents() {
 			return fmt.Errorf("%w: payment of %d exceeds the balance due of %d", model.ErrConflict, amountCents, doc.BalanceDueCents())
@@ -214,7 +234,7 @@ func (s *BillingDocumentService) RecordPayment(ctx context.Context, customerID, 
 		if !model.CanTransition(model.ParentInvoice, doc.Status, next) {
 			return fmt.Errorf("%w: a %s invoice cannot take payments", model.ErrConflict, doc.Status)
 		}
-		return tx.AddPayment(ctx, invoiceID, amountCents, next)
+		return tx.AddPayment(ctx, invoiceID, amountCents, next, idempotencyKey)
 	})
 	if err != nil {
 		return model.BillingDocument{}, fmt.Errorf("record payment: %w", err)
@@ -262,7 +282,7 @@ func (s *BillingDocumentService) Convert(ctx context.Context, customerID, estima
 		for i := range items {
 			items[i].ID, items[i].BillingDocumentID = 0, 0
 		}
-		n := s.now() // the server's local calendar day, not the UTC one
+		n := s.now() // the clock's own calendar day (the app's clock is business-local), not the UTC one
 		today := time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, time.UTC)
 		invoiceID, err = tx.Create(ctx, model.BillingDocument{
 			ParentType:      model.ParentInvoice,
