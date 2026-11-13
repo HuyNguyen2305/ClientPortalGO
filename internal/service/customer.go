@@ -61,6 +61,9 @@ func (s *CustomerService) Get(ctx context.Context, id int64) (model.Customer, er
 
 // List returns one page of customers. nextAfterID is 0 on the last page.
 func (s *CustomerService) List(ctx context.Context, afterID int64, limit int) (items []model.Customer, nextAfterID int64, err error) {
+	if limit < 1 {
+		return nil, 0, fmt.Errorf("%w: limit must be at least 1", model.ErrValidation)
+	}
 	items, err = s.repo.List(ctx, afterID, limit+1)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list customers: %w", err)

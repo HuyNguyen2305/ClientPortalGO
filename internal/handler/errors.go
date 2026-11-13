@@ -18,8 +18,11 @@ func RespondError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, model.ErrValidation):
 		status, code, msg = http.StatusBadRequest, "invalid_request", err.Error()
+	case errors.Is(err, model.ErrUnauthorized):
+		status, code, msg = http.StatusUnauthorized, "unauthorized", err.Error()
 	case errors.Is(err, model.ErrNotFound):
-		status, code, msg = http.StatusNotFound, "not_found", err.Error()
+		// Not the wrapped chain: it names internal operations and row IDs.
+		status, code, msg = http.StatusNotFound, "not_found", model.ErrNotFound.Error()
 	case errors.Is(err, model.ErrConflict):
 		status, code, msg = http.StatusConflict, "conflict", err.Error()
 	default:

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"sync"
 	"testing"
 	"time"
@@ -160,6 +161,76 @@ func TestDecliningFreesTheSlot(t *testing.T) {
 
 	again := w.book(t, w.customer, w.location, "10:00")
 	assert.Equal(t, http.StatusCreated, again.code, again.body)
+}
+
+func (w world) cancel(t *testing.T, customer, bookingID int64) *httptest.ResponseRecorder {
+	t.Helper()
+	return w.app.Do(t, http.MethodPost, fmt.Sprintf("/api/v1/bookings/%d/cancel", bookingID), customer, nil)
+}
+
+func TestCancelBooking(t *testing.T) {
+	w := newWorld(t)
+
+	t.Run("an open booking is cancelled and its slot freed", func(t *testing.T) {
+		r := w.book(t, w.customer, w.location, "08:00")
+		require.Equal(t, http.StatusCreated, r.code, r.body)
+		rec := w.cancel(t, w.customer, r.booking.ID)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		got := testapp.Decode[dto.BookingResponse](t, rec)
+		assert.True(t, got.Cancelled)
+		assert.Equal(t, "declined", got.Estimate.Status)
+		assert.Contains(t, w.slots(t), "08:00")
+		assert.Equal(t, http.StatusConflict, w.cancel(t, w.customer, r.booking.ID).Code, "cancelling twice")
+	})
+
+	t.Run("an accepted booking can be cancelled", func(t *testing.T) {
+		r := w.book(t, w.customer, w.location, "09:00")
+		require.Equal(t, http.StatusCreated, r.code, r.body)
+		est := fmt.Sprintf("/api/v1/estimates/%d/accept", r.booking.Estimate.ID)
+		require.Equal(t, http.StatusOK, w.app.Do(t, http.MethodPost, est, w.customer, nil).Code)
+		rec := w.cancel(t, w.customer, r.booking.ID)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		assert.True(t, testapp.Decode[dto.BookingResponse](t, rec).Cancelled)
+	})
+
+	t.Run("a booking whose estimate became an invoice cannot be cancelled", func(t *testing.T) {
+		r := w.book(t, w.customer, w.location, "10:00")
+		require.Equal(t, http.StatusCreated, r.code, r.body)
+		est := fmt.Sprintf("/api/v1/estimates/%d", r.booking.Estimate.ID)
+		require.Equal(t, http.StatusOK, w.app.Do(t, http.MethodPost, est+"/accept", w.customer, nil).Code)
+		require.Equal(t, http.StatusCreated, w.app.Do(t, http.MethodPost, est+"/convert", w.customer, nil).Code)
+		assert.Equal(t, http.StatusConflict, w.cancel(t, w.customer, r.booking.ID).Code)
+	})
+
+	t.Run("another customer's booking is not found", func(t *testing.T) {
+		r := w.book(t, w.customer, w.location, "11:00")
+		require.Equal(t, http.StatusCreated, r.code, r.body)
+		other, _ := newCustomer(t, w.app, "B")
+		assert.Equal(t, http.StatusNotFound, w.cancel(t, other, r.booking.ID).Code)
+	})
+
+	t.Run("an unknown booking is not found", func(t *testing.T) {
+		assert.Equal(t, http.StatusNotFound, w.cancel(t, w.customer, 999999).Code)
+	})
+}
+
+func TestBookingCapPerCustomer(t *testing.T) {
+	w := newWorld(t) // the test API allows 3 upcoming bookings per customer
+	var first int64
+	for i, hhmm := range []string{"07:00", "08:00", "09:00"} {
+		r := w.book(t, w.customer, w.location, hhmm)
+		require.Equal(t, http.StatusCreated, r.code, r.body)
+		if i == 0 {
+			first = r.booking.ID
+		}
+	}
+	assert.Equal(t, http.StatusConflict, w.book(t, w.customer, w.location, "10:00").code, "fourth booking")
+
+	other, otherLoc := newCustomer(t, w.app, "B")
+	assert.Equal(t, http.StatusCreated, w.book(t, other, otherLoc, "10:00").code, "the cap is per customer")
+
+	require.Equal(t, http.StatusOK, w.cancel(t, w.customer, first).Code)
+	assert.Equal(t, http.StatusCreated, w.book(t, w.customer, w.location, "11:00").code, "cancelling frees a place")
 }
 
 func TestConcurrentBookingsOfOneSlot(t *testing.T) {

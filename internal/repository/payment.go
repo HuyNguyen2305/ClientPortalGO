@@ -9,13 +9,15 @@ import (
 	"clientportal/internal/model"
 )
 
-// AddPayment records a payment and updates the invoice's paid amount and status.
+// AddPayment records a payment and updates the invoice's paid amount and status. An empty
+// idempotencyKey stores none.
 // Call it inside WithTx after GetForUpdate, so concurrent payments are serialised.
-func (r *BillingDocuments) AddPayment(ctx context.Context, documentID, amountCents int64, newStatus model.Status) error {
+func (r *BillingDocuments) AddPayment(ctx context.Context, documentID, amountCents int64, newStatus model.Status, idempotencyKey string) error {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 	if _, err := r.db.Exec(ctx,
-		`INSERT INTO payments (billing_document_id, amount_cents) VALUES ($1, $2)`, documentID, amountCents); err != nil {
+		`INSERT INTO payments (billing_document_id, amount_cents, idempotency_key) VALUES ($1, $2, NULLIF($3, ''))`,
+		documentID, amountCents, idempotencyKey); err != nil {
 		return fmt.Errorf("insert payment: %w", mapErr(err))
 	}
 	if _, err := r.db.Exec(ctx,
@@ -26,6 +28,19 @@ func (r *BillingDocuments) AddPayment(ctx context.Context, documentID, amountCen
 		return fmt.Errorf("apply payment: %w", mapErr(err))
 	}
 	return nil
+}
+
+// HasPaymentKey reports whether the invoice already has a payment recorded under the key.
+func (r *BillingDocuments) HasPaymentKey(ctx context.Context, documentID int64, key string) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	var found bool
+	if err := r.db.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM payments WHERE billing_document_id = $1 AND idempotency_key = $2)`,
+		documentID, key).Scan(&found); err != nil {
+		return false, fmt.Errorf("check payment key: %w", err)
+	}
+	return found, nil
 }
 
 // ListPayments returns an invoice's payments, oldest first.

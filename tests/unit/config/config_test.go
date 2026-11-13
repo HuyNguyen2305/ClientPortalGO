@@ -12,20 +12,22 @@ import (
 )
 
 func TestLoad(t *testing.T) {
-	keys := []string{"DATABASE_URL", "PORT", "DB_MAX_CONNS", "QUERY_TIMEOUT"}
+	keys := []string{"DATABASE_URL", "ADMIN_API_KEY", "PORT", "DB_MAX_CONNS", "QUERY_TIMEOUT", "BOOKING_MAX_LIVE"}
 	tests := []struct {
 		name    string
 		env     map[string]string
 		want    config.Config
 		wantErr bool
 	}{
-		{"defaults", map[string]string{"DATABASE_URL": "postgres://x"},
-			config.Config{DatabaseURL: "postgres://x", Port: "8080", DBMaxConns: 10, QueryTimeout: 5 * time.Second}, false},
-		{"overrides", map[string]string{"DATABASE_URL": "postgres://x", "PORT": "9000", "DB_MAX_CONNS": "25", "QUERY_TIMEOUT": "2s"},
-			config.Config{DatabaseURL: "postgres://x", Port: "9000", DBMaxConns: 25, QueryTimeout: 2 * time.Second}, false},
-		{"missing database url", map[string]string{}, config.Config{}, true},
-		{"bad max conns", map[string]string{"DATABASE_URL": "postgres://x", "DB_MAX_CONNS": "many"}, config.Config{}, true},
-		{"bad timeout", map[string]string{"DATABASE_URL": "postgres://x", "QUERY_TIMEOUT": "soon"}, config.Config{}, true},
+		{"defaults", map[string]string{"DATABASE_URL": "postgres://x", "ADMIN_API_KEY": "k"},
+			config.Config{DatabaseURL: "postgres://x", AdminAPIKey: "k", Port: "8080", DBMaxConns: 10, QueryTimeout: 5 * time.Second, MaxLiveBookings: 3}, false},
+		{"overrides", map[string]string{"DATABASE_URL": "postgres://x", "ADMIN_API_KEY": "k", "PORT": "9000", "DB_MAX_CONNS": "25", "QUERY_TIMEOUT": "2s", "BOOKING_MAX_LIVE": "5"},
+			config.Config{DatabaseURL: "postgres://x", AdminAPIKey: "k", Port: "9000", DBMaxConns: 25, QueryTimeout: 2 * time.Second, MaxLiveBookings: 5}, false},
+		{"zero booking cap", map[string]string{"DATABASE_URL": "postgres://x", "ADMIN_API_KEY": "k", "BOOKING_MAX_LIVE": "0"}, config.Config{}, true},
+		{"missing database url", map[string]string{"ADMIN_API_KEY": "k"}, config.Config{}, true},
+		{"missing admin key", map[string]string{"DATABASE_URL": "postgres://x"}, config.Config{}, true},
+		{"bad max conns", map[string]string{"DATABASE_URL": "postgres://x", "ADMIN_API_KEY": "k", "DB_MAX_CONNS": "many"}, config.Config{}, true},
+		{"bad timeout", map[string]string{"DATABASE_URL": "postgres://x", "ADMIN_API_KEY": "k", "QUERY_TIMEOUT": "soon"}, config.Config{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -48,6 +50,7 @@ func TestLoadBookingHours(t *testing.T) {
 	keys := []string{"BUSINESS_TZ", "BOOKING_OPEN", "BOOKING_CLOSE", "BOOKING_STEP_MINUTES", "BOOKING_HORIZON_DAYS"}
 	set := func(t *testing.T, env map[string]string) {
 		t.Setenv("DATABASE_URL", "postgres://x")
+		t.Setenv("ADMIN_API_KEY", "k")
 		for _, k := range keys {
 			t.Setenv(k, env[k])
 		}

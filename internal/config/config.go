@@ -15,22 +15,29 @@ import (
 // Config holds the settings the API needs at startup.
 type Config struct {
 	DatabaseURL  string
+	AdminAPIKey  string
 	Port         string
 	DBMaxConns   int32
 	QueryTimeout time.Duration
 	Hours        model.Hours
+	// MaxLiveBookings is how many upcoming bookings one customer may hold.
+	MaxLiveBookings int
 }
 
 // Load reads the environment. An empty variable means "use the default".
 func Load() (Config, error) {
 	cfg := Config{
 		DatabaseURL:  os.Getenv("DATABASE_URL"),
+		AdminAPIKey:  os.Getenv("ADMIN_API_KEY"),
 		Port:         "8080",
 		DBMaxConns:   10,
 		QueryTimeout: 5 * time.Second,
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
+	}
+	if cfg.AdminAPIKey == "" {
+		return Config{}, errors.New("ADMIN_API_KEY is required")
 	}
 	if v := os.Getenv("PORT"); v != "" {
 		cfg.Port = v
@@ -54,6 +61,9 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	cfg.Hours = hours
+	if cfg.MaxLiveBookings, err = positiveInt("BOOKING_MAX_LIVE", "3"); err != nil {
+		return Config{}, err
+	}
 	return cfg, nil
 }
 

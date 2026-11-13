@@ -4,6 +4,7 @@ package repository
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -20,7 +21,13 @@ func mapErr(err error) error {
 	if errors.As(err, &pgErr) {
 		switch pgErr.Code {
 		case "23503": // foreign_key_violation
+			// Postgres words an insert/update into a missing parent differently from a delete of a used one.
+			if strings.HasPrefix(pgErr.Message, "insert or update") {
+				return fmt.Errorf("%w: a referenced record does not exist", model.ErrValidation)
+			}
 			return fmt.Errorf("%w: record is still referenced", model.ErrConflict)
+		case "23514": // check_violation
+			return fmt.Errorf("%w: a value is out of range", model.ErrValidation)
 		case "23505": // unique_violation
 			return fmt.Errorf("%w: record already exists", model.ErrConflict)
 		case "23P01": // exclusion_violation: only bookings_no_overlap today

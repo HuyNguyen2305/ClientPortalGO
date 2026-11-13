@@ -153,6 +153,12 @@ func TestBillingDocumentService_List(t *testing.T) {
 	day := func(d int) time.Time { return time.Date(2026, 12, d, 0, 0, 0, 0, time.UTC) }
 	rows := []model.BillingDocument{{ID: 3, DocumentDate: day(10)}, {ID: 2, DocumentDate: day(9)}, {ID: 1, DocumentDate: day(8)}}
 
+	t.Run("limit below one", func(t *testing.T) {
+		f := newDocFixture(t)
+		_, _, err := f.svc.List(context.Background(), model.DocumentFilter{CustomerID: custID, ParentType: model.ParentInvoice, Limit: 0})
+		assert.True(t, errors.Is(err, model.ErrValidation), "got %v", err)
+	})
+
 	t.Run("status of the other type", func(t *testing.T) {
 		f := newDocFixture(t)
 		s := model.StatusAccepted

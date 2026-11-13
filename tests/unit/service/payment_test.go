@@ -35,12 +35,12 @@ func TestRecordPayment(t *testing.T) {
 			f.docs.EXPECT().GetForUpdate(mock.Anything, custID, model.ParentInvoice, int64(9)).
 				Return(model.BillingDocument{ID: 9, ParentType: model.ParentInvoice, Status: tt.status, TotalCents: 6500, AmountPaidCents: tt.paid}, nil)
 			if tt.wantStatus != "" {
-				f.docs.EXPECT().AddPayment(mock.Anything, int64(9), tt.amount, tt.wantStatus).Return(nil).Once()
+				f.docs.EXPECT().AddPayment(mock.Anything, int64(9), tt.amount, tt.wantStatus, "").Return(nil).Once()
 				f.docs.EXPECT().Get(mock.Anything, custID, model.ParentInvoice, int64(9)).Return(model.BillingDocument{ID: 9}, nil)
 				f.docs.EXPECT().ListItems(mock.Anything, int64(9)).Return(nil, nil)
 			}
 
-			_, err := f.svc.RecordPayment(context.Background(), custID, 9, tt.amount)
+			_, err := f.svc.RecordPayment(context.Background(), custID, 9, tt.amount, "")
 			if tt.wantStatus == "" {
 				assert.True(t, errors.Is(err, model.ErrConflict), "got %v", err)
 				return
@@ -48,6 +48,43 @@ func TestRecordPayment(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestRecordPayment_IdempotencyKey(t *testing.T) {
+	open := model.BillingDocument{ID: 9, ParentType: model.ParentInvoice, Status: model.StatusOpen, TotalCents: 6500}
+	returnsInvoice := func(f docFixture) {
+		f.docs.EXPECT().Get(mock.Anything, custID, model.ParentInvoice, int64(9)).Return(model.BillingDocument{ID: 9}, nil)
+		f.docs.EXPECT().ListItems(mock.Anything, int64(9)).Return(nil, nil)
+	}
+
+	t.Run("a new key records the payment with the key", func(t *testing.T) {
+		f := newDocFixture(t)
+		f.docs.EXPECT().GetForUpdate(mock.Anything, custID, model.ParentInvoice, int64(9)).Return(open, nil)
+		f.docs.EXPECT().HasPaymentKey(mock.Anything, int64(9), "k1").Return(false, nil)
+		f.docs.EXPECT().AddPayment(mock.Anything, int64(9), int64(1000), model.StatusPartiallyPaid, "k1").Return(nil).Once()
+		returnsInvoice(f)
+		_, err := f.svc.RecordPayment(context.Background(), custID, 9, 1000, "k1")
+		require.NoError(t, err)
+	})
+
+	t.Run("a seen key records nothing, even when the retry would now overpay", func(t *testing.T) {
+		f := newDocFixture(t)
+		paid := open
+		paid.Status, paid.AmountPaidCents = model.StatusPaid, 6500
+		f.docs.EXPECT().GetForUpdate(mock.Anything, custID, model.ParentInvoice, int64(9)).Return(paid, nil)
+		f.docs.EXPECT().HasPaymentKey(mock.Anything, int64(9), "k1").Return(true, nil)
+		returnsInvoice(f) // AddPayment is not expected: the mock fails the test if it is called
+		_, err := f.svc.RecordPayment(context.Background(), custID, 9, 6500, "k1")
+		require.NoError(t, err)
+	})
+
+	t.Run("a lookup failure stops the payment", func(t *testing.T) {
+		f := newDocFixture(t)
+		f.docs.EXPECT().GetForUpdate(mock.Anything, custID, model.ParentInvoice, int64(9)).Return(open, nil)
+		f.docs.EXPECT().HasPaymentKey(mock.Anything, int64(9), "k1").Return(false, errors.New("db down"))
+		_, err := f.svc.RecordPayment(context.Background(), custID, 9, 1000, "k1")
+		assert.Error(t, err)
+	})
 }
 
 func TestListPaymentsChecksOwnership(t *testing.T) {

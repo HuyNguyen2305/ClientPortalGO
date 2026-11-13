@@ -30,9 +30,10 @@ func TestRespondError(t *testing.T) {
 		code    string
 		message string
 	}{
-		{"not found", notFound, http.StatusNotFound, "not_found", notFound.Error()},
+		{"not found", notFound, http.StatusNotFound, "not_found", "not found"},
 		{"conflict", conflict, http.StatusConflict, "conflict", conflict.Error()},
 		{"validation", invalid, http.StatusBadRequest, "invalid_request", invalid.Error()},
+		{"unauthorized", fmt.Errorf("%w: bad key", model.ErrUnauthorized), http.StatusUnauthorized, "unauthorized", "unauthorized: bad key"},
 		{"unknown", errors.New("connection refused"), http.StatusInternalServerError, "internal", "internal server error"},
 	}
 	for _, tt := range tests {

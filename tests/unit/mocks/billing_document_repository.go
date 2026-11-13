@@ -50,16 +50,16 @@ func (_m *MockBillingDocumentRepository) EXPECT() *MockBillingDocumentRepository
 }
 
 // AddPayment provides a mock function for the type MockBillingDocumentRepository
-func (_mock *MockBillingDocumentRepository) AddPayment(ctx context.Context, documentID int64, amountCents int64, newStatus model.Status) error {
-	ret := _mock.Called(ctx, documentID, amountCents, newStatus)
+func (_mock *MockBillingDocumentRepository) AddPayment(ctx context.Context, documentID int64, amountCents int64, newStatus model.Status, idempotencyKey string) error {
+	ret := _mock.Called(ctx, documentID, amountCents, newStatus, idempotencyKey)
 
 	if len(ret) == 0 {
 		panic("no return value specified for AddPayment")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64, model.Status) error); ok {
-		r0 = returnFunc(ctx, documentID, amountCents, newStatus)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64, model.Status, string) error); ok {
+		r0 = returnFunc(ctx, documentID, amountCents, newStatus, idempotencyKey)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -76,11 +76,12 @@ type MockBillingDocumentRepository_AddPayment_Call struct {
 //   - documentID int64
 //   - amountCents int64
 //   - newStatus model.Status
-func (_e *MockBillingDocumentRepository_Expecter) AddPayment(ctx any, documentID any, amountCents any, newStatus any) *MockBillingDocumentRepository_AddPayment_Call {
-	return &MockBillingDocumentRepository_AddPayment_Call{Call: _e.mock.On("AddPayment", ctx, documentID, amountCents, newStatus)}
+//   - idempotencyKey string
+func (_e *MockBillingDocumentRepository_Expecter) AddPayment(ctx any, documentID any, amountCents any, newStatus any, idempotencyKey any) *MockBillingDocumentRepository_AddPayment_Call {
+	return &MockBillingDocumentRepository_AddPayment_Call{Call: _e.mock.On("AddPayment", ctx, documentID, amountCents, newStatus, idempotencyKey)}
 }
 
-func (_c *MockBillingDocumentRepository_AddPayment_Call) Run(run func(ctx context.Context, documentID int64, amountCents int64, newStatus model.Status)) *MockBillingDocumentRepository_AddPayment_Call {
+func (_c *MockBillingDocumentRepository_AddPayment_Call) Run(run func(ctx context.Context, documentID int64, amountCents int64, newStatus model.Status, idempotencyKey string)) *MockBillingDocumentRepository_AddPayment_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -98,11 +99,16 @@ func (_c *MockBillingDocumentRepository_AddPayment_Call) Run(run func(ctx contex
 		if args[3] != nil {
 			arg3 = args[3].(model.Status)
 		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -113,7 +119,7 @@ func (_c *MockBillingDocumentRepository_AddPayment_Call) Return(err error) *Mock
 	return _c
 }
 
-func (_c *MockBillingDocumentRepository_AddPayment_Call) RunAndReturn(run func(ctx context.Context, documentID int64, amountCents int64, newStatus model.Status) error) *MockBillingDocumentRepository_AddPayment_Call {
+func (_c *MockBillingDocumentRepository_AddPayment_Call) RunAndReturn(run func(ctx context.Context, documentID int64, amountCents int64, newStatus model.Status, idempotencyKey string) error) *MockBillingDocumentRepository_AddPayment_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -734,6 +740,144 @@ func (_c *MockBillingDocumentRepository_GetForUpdate_Call) Return(billingDocumen
 }
 
 func (_c *MockBillingDocumentRepository_GetForUpdate_Call) RunAndReturn(run func(ctx context.Context, customerID int64, pt model.ParentType, id int64) (model.BillingDocument, error)) *MockBillingDocumentRepository_GetForUpdate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// HasConvertedInvoice provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) HasConvertedInvoice(ctx context.Context, estimateID int64) (bool, error) {
+	ret := _mock.Called(ctx, estimateID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for HasConvertedInvoice")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) (bool, error)); ok {
+		return returnFunc(ctx, estimateID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) bool); ok {
+		r0 = returnFunc(ctx, estimateID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = returnFunc(ctx, estimateID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBillingDocumentRepository_HasConvertedInvoice_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasConvertedInvoice'
+type MockBillingDocumentRepository_HasConvertedInvoice_Call struct {
+	*mock.Call
+}
+
+// HasConvertedInvoice is a helper method to define mock.On call
+//   - ctx context.Context
+//   - estimateID int64
+func (_e *MockBillingDocumentRepository_Expecter) HasConvertedInvoice(ctx any, estimateID any) *MockBillingDocumentRepository_HasConvertedInvoice_Call {
+	return &MockBillingDocumentRepository_HasConvertedInvoice_Call{Call: _e.mock.On("HasConvertedInvoice", ctx, estimateID)}
+}
+
+func (_c *MockBillingDocumentRepository_HasConvertedInvoice_Call) Run(run func(ctx context.Context, estimateID int64)) *MockBillingDocumentRepository_HasConvertedInvoice_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_HasConvertedInvoice_Call) Return(b bool, err error) *MockBillingDocumentRepository_HasConvertedInvoice_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_HasConvertedInvoice_Call) RunAndReturn(run func(ctx context.Context, estimateID int64) (bool, error)) *MockBillingDocumentRepository_HasConvertedInvoice_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// HasPaymentKey provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) HasPaymentKey(ctx context.Context, documentID int64, key string) (bool, error) {
+	ret := _mock.Called(ctx, documentID, key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for HasPaymentKey")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, string) (bool, error)); ok {
+		return returnFunc(ctx, documentID, key)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, string) bool); ok {
+		r0 = returnFunc(ctx, documentID, key)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64, string) error); ok {
+		r1 = returnFunc(ctx, documentID, key)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBillingDocumentRepository_HasPaymentKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasPaymentKey'
+type MockBillingDocumentRepository_HasPaymentKey_Call struct {
+	*mock.Call
+}
+
+// HasPaymentKey is a helper method to define mock.On call
+//   - ctx context.Context
+//   - documentID int64
+//   - key string
+func (_e *MockBillingDocumentRepository_Expecter) HasPaymentKey(ctx any, documentID any, key any) *MockBillingDocumentRepository_HasPaymentKey_Call {
+	return &MockBillingDocumentRepository_HasPaymentKey_Call{Call: _e.mock.On("HasPaymentKey", ctx, documentID, key)}
+}
+
+func (_c *MockBillingDocumentRepository_HasPaymentKey_Call) Run(run func(ctx context.Context, documentID int64, key string)) *MockBillingDocumentRepository_HasPaymentKey_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_HasPaymentKey_Call) Return(b bool, err error) *MockBillingDocumentRepository_HasPaymentKey_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_HasPaymentKey_Call) RunAndReturn(run func(ctx context.Context, documentID int64, key string) (bool, error)) *MockBillingDocumentRepository_HasPaymentKey_Call {
 	_c.Call.Return(run)
 	return _c
 }

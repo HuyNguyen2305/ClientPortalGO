@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -148,7 +149,10 @@ func (h *BillingDocumentHandler) Convert(c *gin.Context) {
 	c.JSON(http.StatusCreated, dto.FromDocument(inv, true))
 }
 
-// RecordPayment serves POST /invoices/:id/payments.
+// maxIdempotencyKeyLen bounds the Idempotency-Key header a client may send.
+const maxIdempotencyKeyLen = 255
+
+// RecordPayment serves POST /invoices/:id/payments. An Idempotency-Key header makes a retry safe.
 func (h *BillingDocumentHandler) RecordPayment(c *gin.Context) {
 	id, err := PathID(c)
 	if err != nil {
@@ -160,7 +164,12 @@ func (h *BillingDocumentHandler) RecordPayment(c *gin.Context) {
 		RespondError(c, err)
 		return
 	}
-	doc, err := h.svc.RecordPayment(c.Request.Context(), middleware.CustomerID(c), id, req.AmountCents)
+	key := c.GetHeader("Idempotency-Key")
+	if len(key) > maxIdempotencyKeyLen {
+		RespondError(c, fmt.Errorf("%w: Idempotency-Key is longer than %d characters", model.ErrValidation, maxIdempotencyKeyLen))
+		return
+	}
+	doc, err := h.svc.RecordPayment(c.Request.Context(), middleware.CustomerID(c), id, req.AmountCents, key)
 	if err != nil {
 		RespondError(c, err)
 		return

@@ -63,6 +63,19 @@ func (r *BillingDocuments) CancelBookingForEstimate(ctx context.Context, estimat
 	return nil
 }
 
+// HasConvertedInvoice reports whether an invoice was created from the estimate; the unique
+// index on converted_from_id serves the lookup.
+func (r *BillingDocuments) HasConvertedInvoice(ctx context.Context, estimateID int64) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	var found bool
+	if err := r.db.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM billing_documents WHERE converted_from_id = $1)`, estimateID).Scan(&found); err != nil {
+		return false, fmt.Errorf("check converted invoice for estimate %d: %w", estimateID, err)
+	}
+	return found, nil
+}
+
 // BusyIntervals returns every live booking overlapping [from, to), whoever booked it.
 // The range test matches bookings_no_overlap, so its GiST index serves the query.
 func (r *BillingDocuments) BusyIntervals(ctx context.Context, from, to time.Time) ([]model.Interval, error) {

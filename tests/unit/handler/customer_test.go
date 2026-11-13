@@ -18,11 +18,13 @@ import (
 	"clientportal/tests/unit/mocks"
 )
 
+const testAdminKey = "test-admin-key"
+
 func quietLog() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
 func customerRouter(t *testing.T) (*gin.Engine, *mocks.MockCustomerRepository) {
 	repo := mocks.NewMockCustomerRepository(t)
-	r := handler.NewRouter(handler.Deps{Log: quietLog(), Customers: service.NewCustomerService(repo)})
+	r := handler.NewRouter(handler.Deps{Log: quietLog(), AdminKey: testAdminKey, Customers: service.NewCustomerService(repo)})
 	return r, repo
 }
 
@@ -33,9 +35,32 @@ func send(r http.Handler, method, path, body string) *httptest.ResponseRecorder 
 	}
 	req := httptest.NewRequest(method, path, rd)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Admin-Key", testAdminKey)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 	return rec
+}
+
+func TestCustomerHandler_RejectsOversizedBody(t *testing.T) {
+	r, _ := customerRouter(t) // the mock fails the test if the repository is called
+	rec := send(r, http.MethodPost, "/api/v1/customers", `{"name":"`+strings.Repeat("a", 2<<20)+`"}`)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestCustomerHandler_BindErrorsHideValidatorInternals(t *testing.T) {
+	tests := []struct{ name, body, want string }{
+		{"failed rule names the field", `{}`, `Name failed the \"required\" rule`},
+		{"malformed json", `{"name":`, "body is not valid JSON of the expected shape"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, _ := customerRouter(t)
+			rec := send(r, http.MethodPost, "/api/v1/customers", tt.body)
+			assert.Equal(t, http.StatusBadRequest, rec.Code)
+			assert.Contains(t, rec.Body.String(), tt.want)
+			assert.NotContains(t, rec.Body.String(), "Key:")
+		})
+	}
 }
 
 func TestCustomerHandler_RejectsBadInput(t *testing.T) {

@@ -74,6 +74,12 @@ func TestCustomerService_List(t *testing.T) {
 	}
 }
 
+func TestCustomerService_ListRejectsLimitBelowOne(t *testing.T) {
+	repo := mocks.NewMockCustomerRepository(t) // fails the test if called
+	_, _, err := service.NewCustomerService(repo).List(context.Background(), 0, 0)
+	assert.ErrorIs(t, err, model.ErrValidation)
+}
+
 func TestCustomerService_WrapsRepositoryErrors(t *testing.T) {
 	repo := mocks.NewMockCustomerRepository(t)
 	repo.EXPECT().Get(mock.Anything, int64(9)).Return(model.Customer{}, fmt.Errorf("query: %w", model.ErrNotFound))

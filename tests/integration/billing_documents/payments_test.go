@@ -5,6 +5,8 @@ package billing_documents_test
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 
@@ -71,6 +73,59 @@ func TestPayments(t *testing.T) {
 		b, _ := newCustomer(t, w.app, "B")
 		assert.Equal(t, http.StatusNotFound, w.app.Do(t, http.MethodPost, payments, b, pay(1)).Code)
 		assert.Equal(t, http.StatusNotFound, w.app.Do(t, http.MethodGet, payments, b, nil).Code)
+	})
+}
+
+func TestPaymentIdempotencyKey(t *testing.T) {
+	w := newWorld(t)
+	inv := w.openInvoice(t, w.location)
+	payments := docPath("invoices", inv.ID, "/payments")
+	send := func(path, key string, cents int64) *httptest.ResponseRecorder {
+		return w.app.DoWith(t, http.MethodPost, path, w.customer, pay(cents), map[string]string{"Idempotency-Key": key})
+	}
+	count := func(path string) int {
+		rec := w.app.Do(t, http.MethodGet, path, w.customer, nil)
+		require.Equal(t, http.StatusOK, rec.Code)
+		return len(testapp.Decode[dto.Page[dto.PaymentResponse]](t, rec).Data)
+	}
+
+	rec := send(payments, "k1", 1000)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+
+	rec = send(payments, "k1", 1000) // a retry
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	assert.Equal(t, int64(1000), *testapp.Decode[dto.DocumentResponse](t, rec).AmountPaidCents, "recorded once")
+	assert.Equal(t, 1, count(payments))
+
+	assert.Equal(t, http.StatusCreated, send(payments, "k2", 500).Code, "a new key is a new payment")
+	assert.Equal(t, 2, count(payments))
+
+	other := w.openInvoice(t, w.location)
+	otherPayments := docPath("invoices", other.ID, "/payments")
+	assert.Equal(t, http.StatusCreated, send(otherPayments, "k1", 100).Code, "keys are per invoice")
+	assert.Equal(t, 1, count(otherPayments))
+
+	t.Run("concurrent retries record once", func(t *testing.T) {
+		inv := w.openInvoice(t, w.location)
+		path := docPath("invoices", inv.ID, "/payments")
+		codes := make([]int, 5)
+		var wg sync.WaitGroup
+		for i := range codes {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				codes[i] = send(path, "same", 500).Code
+			}()
+		}
+		wg.Wait()
+		for _, c := range codes {
+			assert.Equal(t, http.StatusCreated, c)
+		}
+		assert.Equal(t, 1, count(path))
+	})
+
+	t.Run("an overlong key is rejected", func(t *testing.T) {
+		assert.Equal(t, http.StatusBadRequest, send(payments, strings.Repeat("k", 256), 1).Code)
 	})
 }
 

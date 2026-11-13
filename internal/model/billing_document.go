@@ -30,6 +30,8 @@ const (
 
 // transitions lists, per parent type, every status and the statuses it may move to.
 // A status with no outgoing edges still appears so ValidStatus can find it.
+// A partially paid invoice cannot be voided on purpose: there is no refund flow yet, so voiding
+// would leave the money received unaccounted for. Add the edge together with refunds.
 var transitions = map[ParentType]map[Status][]Status{
 	ParentInvoice: {
 		StatusDraft: {StatusOpen, StatusVoid},
