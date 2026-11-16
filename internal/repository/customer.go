@@ -86,6 +86,32 @@ func (r *Customers) Update(ctx context.Context, c model.Customer) (model.Custome
 	return out, nil
 }
 
+// StripeID returns the customer's Stripe customer id, or "" when none is linked yet.
+func (r *Customers) StripeID(ctx context.Context, id int64) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	var sid string
+	err := r.db.QueryRow(ctx, `SELECT COALESCE(stripe_customer_id, '') FROM customers WHERE id = $1`, id).Scan(&sid)
+	if err != nil {
+		return "", fmt.Errorf("get stripe id of customer %d: %w", id, mapErr(err))
+	}
+	return sid, nil
+}
+
+// SetStripeID links the customer to a Stripe customer.
+func (r *Customers) SetStripeID(ctx context.Context, id int64, stripeID string) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	tag, err := r.db.Exec(ctx, `UPDATE customers SET stripe_customer_id = $2, updated_at = now() WHERE id = $1`, id, stripeID)
+	if err != nil {
+		return fmt.Errorf("set stripe id of customer %d: %w", id, mapErr(err))
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("set stripe id of customer %d: %w", id, model.ErrNotFound)
+	}
+	return nil
+}
+
 // Delete removes a customer; it fails with ErrConflict while anything references it.
 func (r *Customers) Delete(ctx context.Context, id int64) error {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)

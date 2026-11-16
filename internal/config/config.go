@@ -22,16 +22,19 @@ type Config struct {
 	Hours        model.Hours
 	// MaxLiveBookings is how many upcoming bookings one customer may hold.
 	MaxLiveBookings int
+	// StripeSecretKey is optional; without it the payment-method routes are off.
+	StripeSecretKey string
 }
 
 // Load reads the environment. An empty variable means "use the default".
 func Load() (Config, error) {
 	cfg := Config{
-		DatabaseURL:  os.Getenv("DATABASE_URL"),
-		AdminAPIKey:  os.Getenv("ADMIN_API_KEY"),
-		Port:         "8080",
-		DBMaxConns:   10,
-		QueryTimeout: 5 * time.Second,
+		DatabaseURL:     os.Getenv("DATABASE_URL"),
+		AdminAPIKey:     os.Getenv("ADMIN_API_KEY"),
+		StripeSecretKey: os.Getenv("STRIPE_SECRET_KEY"),
+		Port:            "8080",
+		DBMaxConns:      10,
+		QueryTimeout:    5 * time.Second,
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")

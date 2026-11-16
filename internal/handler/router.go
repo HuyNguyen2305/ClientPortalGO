@@ -21,6 +21,8 @@ type Deps struct {
 	Documents *service.BillingDocumentService
 	Catalog   *service.Catalog
 	Bookings  *service.BookingService
+	// PaymentMethods is nil when Stripe is not configured.
+	PaymentMethods *service.PaymentMethodService
 }
 
 // NewRouter builds the Gin engine with every route.
@@ -92,6 +94,14 @@ func NewRouter(d Deps) *gin.Engine {
 	scoped.GET("/bookings", bookings.list)
 	scoped.GET("/bookings/:id", bookings.get)
 	scoped.POST("/bookings/:id/cancel", bookings.cancel)
+
+	// Off until a Stripe key is configured.
+	if d.PaymentMethods != nil {
+		pm := paymentMethodHandler{svc: d.PaymentMethods}
+		scoped.POST("/payment-methods/setup-intent", pm.setupIntent)
+		scoped.GET("/payment-methods", pm.list)
+		scoped.DELETE("/payment-methods/:id", pm.delete)
+	}
 
 	return r
 }

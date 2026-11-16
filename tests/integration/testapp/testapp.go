@@ -5,6 +5,7 @@ package testapp
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -27,6 +28,7 @@ import (
 type App struct {
 	Handler http.Handler
 	Pool    *pgxpool.Pool
+	Gateway *FakeGateway
 }
 
 // Hours are the opening hours the test API runs with: 07:00 to 17:00 every day, a 15-minute
@@ -46,7 +48,36 @@ func New(t *testing.T) *App {
 	pool := testdb.New(t)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	cfg := config.Config{AdminAPIKey: AdminKey, QueryTimeout: 5 * time.Second, Hours: Hours, MaxLiveBookings: 3}
-	return &App{Handler: app.New(pool, cfg, log), Pool: pool}
+	gw := &FakeGateway{Cards: map[string][]model.Card{}}
+	return &App{Handler: app.New(pool, cfg, log, gw), Pool: pool, Gateway: gw}
+}
+
+// FakeGateway is an in-memory payment gateway: no network, no Stripe key.
+type FakeGateway struct {
+	Cards map[string][]model.Card // by gateway customer id
+}
+
+func (g *FakeGateway) CreateCustomer(_ context.Context, customerID int64) (string, error) {
+	return "cus_" + strconv.FormatInt(customerID, 10), nil
+}
+
+func (g *FakeGateway) CreateSetupIntent(_ context.Context, gid string) (string, error) {
+	return "seti_secret_" + gid, nil
+}
+
+func (g *FakeGateway) ListCards(_ context.Context, gid string) ([]model.Card, error) {
+	return g.Cards[gid], nil
+}
+
+func (g *FakeGateway) DetachCard(_ context.Context, cardID string) error {
+	for gid, cards := range g.Cards {
+		for i, c := range cards {
+			if c.ID == cardID {
+				g.Cards[gid] = append(cards[:i:i], cards[i+1:]...)
+			}
+		}
+	}
+	return nil
 }
 
 // AdminKey is the X-Admin-Key the test API accepts; Do sends it on every request.

@@ -48,8 +48,9 @@ func run(log *slog.Logger) error {
 
 	gin.SetMode(gin.ReleaseMode)
 	srv := &http.Server{
-		Addr:              ":" + cfg.Port,
-		Handler:           app.New(pool, cfg, log),
+		Addr: ":" + cfg.Port,
+		// nil gateway: the real Stripe adapter is not written yet (see PR notes), so the routes stay off.
+		Handler:           app.New(pool, cfg, log, nil),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
