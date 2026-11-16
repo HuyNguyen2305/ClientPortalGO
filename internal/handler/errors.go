@@ -23,6 +23,8 @@ func RespondError(c *gin.Context, err error) {
 	case errors.Is(err, model.ErrNotFound):
 		// Not the wrapped chain: it names internal operations and row IDs.
 		status, code, msg = http.StatusNotFound, "not_found", model.ErrNotFound.Error()
+	case errors.Is(err, model.ErrPaymentFailed):
+		status, code, msg = http.StatusPaymentRequired, "payment_failed", err.Error()
 	case errors.Is(err, model.ErrConflict):
 		status, code, msg = http.StatusConflict, "conflict", err.Error()
 	default:

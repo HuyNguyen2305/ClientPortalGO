@@ -10,4 +10,7 @@ var (
 	ErrValidation = errors.New("invalid request")
 
 	ErrUnauthorized = errors.New("unauthorized")
+
+	// ErrPaymentFailed is a card charge that did not go through: declined, or needing extra bank confirmation.
+	ErrPaymentFailed = errors.New("payment failed")
 )

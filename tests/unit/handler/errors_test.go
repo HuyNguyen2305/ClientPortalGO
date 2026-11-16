@@ -34,6 +34,7 @@ func TestRespondError(t *testing.T) {
 		{"conflict", conflict, http.StatusConflict, "conflict", conflict.Error()},
 		{"validation", invalid, http.StatusBadRequest, "invalid_request", invalid.Error()},
 		{"unauthorized", fmt.Errorf("%w: bad key", model.ErrUnauthorized), http.StatusUnauthorized, "unauthorized", "unauthorized: bad key"},
+		{"payment failed", fmt.Errorf("%w: card declined", model.ErrPaymentFailed), http.StatusPaymentRequired, "payment_failed", "payment failed: card declined"},
 		{"unknown", errors.New("connection refused"), http.StatusInternalServerError, "internal", "internal server error"},
 	}
 	for _, tt := range tests {
