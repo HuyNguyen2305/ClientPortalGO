@@ -101,6 +101,7 @@ func NewRouter(d Deps) *gin.Engine {
 		scoped.POST("/payment-methods/setup-intent", pm.setupIntent)
 		scoped.GET("/payment-methods", pm.list)
 		scoped.DELETE("/payment-methods/:id", pm.delete)
+		scoped.POST("/invoices/:id/pay", pm.payInvoice)
 	}
 
 	return r

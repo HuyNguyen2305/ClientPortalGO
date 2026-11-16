@@ -19,22 +19,23 @@ import (
 func New(pool *pgxpool.Pool, cfg config.Config, log *slog.Logger, gw service.PaymentGateway) http.Handler {
 	queryTimeout := cfg.QueryTimeout
 	customers := repository.NewCustomers(pool, queryTimeout)
-	var paymentMethods *service.PaymentMethodService
-	if gw != nil {
-		paymentMethods = service.NewPaymentMethodService(customers, gw)
-	}
 	locations := repository.NewLocations(pool, queryTimeout)
 	documents := docRepo{repository.NewBillingDocuments(pool, queryTimeout)}
 	services := repository.NewServices(pool, queryTimeout)
 	// Dates are business-local, like bookings: a UTC server must not date an evening conversion tomorrow.
 	now := func() time.Time { return time.Now().In(cfg.Hours.Loc) }
+	invoices := service.NewBillingDocumentService(documents, locations, now)
+	var paymentMethods *service.PaymentMethodService
+	if gw != nil {
+		paymentMethods = service.NewPaymentMethodService(customers, gw, invoices)
+	}
 	return handler.NewRouter(handler.Deps{
 		Log:            log,
 		AdminKey:       cfg.AdminAPIKey,
 		Ping:           pool.Ping,
 		Customers:      service.NewCustomerService(customers),
 		Locations:      service.NewLocationService(locations),
-		Documents:      service.NewBillingDocumentService(documents, locations, now),
+		Documents:      invoices,
 		Catalog:        service.NewCatalog(services),
 		Bookings:       service.NewBookingService(documents, locations, services, cfg.Hours, cfg.MaxLiveBookings, now),
 		PaymentMethods: paymentMethods,

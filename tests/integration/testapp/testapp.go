@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -48,13 +49,26 @@ func New(t *testing.T) *App {
 	pool := testdb.New(t)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	cfg := config.Config{AdminAPIKey: AdminKey, QueryTimeout: 5 * time.Second, Hours: Hours, MaxLiveBookings: 3}
-	gw := &FakeGateway{Cards: map[string][]model.Card{}}
+	gw := &FakeGateway{Cards: map[string][]model.Card{}, Charges: map[string]int64{}}
 	return &App{Handler: app.New(pool, cfg, log, gw), Pool: pool, Gateway: gw}
 }
 
 // FakeGateway is an in-memory payment gateway: no network, no Stripe key.
 type FakeGateway struct {
-	Cards map[string][]model.Card // by gateway customer id
+	Cards   map[string][]model.Card // by gateway customer id
+	Charges map[string]int64        // amount by idempotency key: a repeated key charges once, like Stripe
+	Decline bool                    // makes every new charge fail
+}
+
+func (g *FakeGateway) Charge(_ context.Context, _, _ string, amountCents int64, key string) error {
+	if _, seen := g.Charges[key]; seen {
+		return nil
+	}
+	if g.Decline {
+		return fmt.Errorf("%w: card declined", model.ErrPaymentFailed)
+	}
+	g.Charges[key] = amountCents
+	return nil
 }
 
 func (g *FakeGateway) CreateCustomer(_ context.Context, customerID int64) (string, error) {

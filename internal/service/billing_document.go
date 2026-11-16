@@ -242,6 +242,18 @@ func (s *BillingDocumentService) RecordPayment(ctx context.Context, customerID, 
 	return s.Get(ctx, customerID, model.ParentInvoice, invoiceID)
 }
 
+// PaymentRecorded reports whether one of the customer's invoices already has a payment under the key.
+func (s *BillingDocumentService) PaymentRecorded(ctx context.Context, customerID, invoiceID int64, key string) (bool, error) {
+	if _, err := s.docs.Get(ctx, customerID, model.ParentInvoice, invoiceID); err != nil {
+		return false, fmt.Errorf("payment recorded: %w", err)
+	}
+	seen, err := s.docs.HasPaymentKey(ctx, invoiceID, key)
+	if err != nil {
+		return false, fmt.Errorf("payment recorded: %w", err)
+	}
+	return seen, nil
+}
+
 // ListPayments returns the payments on one of the customer's invoices.
 func (s *BillingDocumentService) ListPayments(ctx context.Context, customerID, invoiceID int64) ([]model.Payment, error) {
 	if _, err := s.docs.Get(ctx, customerID, model.ParentInvoice, invoiceID); err != nil {
