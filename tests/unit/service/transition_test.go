@@ -52,6 +52,19 @@ func TestTransition(t *testing.T) {
 		assert.True(t, errors.Is(err, model.ErrConflict), "got %v", err)
 	})
 
+	t.Run("voiding a converted invoice cancels its booking", func(t *testing.T) {
+		f := newDocFixture(t)
+		estimateID := int64(4)
+		f.docs.EXPECT().GetForUpdate(mock.Anything, custID, model.ParentInvoice, int64(9)).
+			Return(model.BillingDocument{ID: 9, Status: model.StatusDraft, ConvertedFromID: &estimateID}, nil)
+		f.docs.EXPECT().UpdateStatus(mock.Anything, int64(9), model.StatusVoid).Return(nil).Once()
+		f.docs.EXPECT().CancelBookingForEstimate(mock.Anything, estimateID).Return(nil).Once()
+		f.docs.EXPECT().Get(mock.Anything, custID, model.ParentInvoice, int64(9)).Return(model.BillingDocument{ID: 9}, nil)
+		f.docs.EXPECT().ListItems(mock.Anything, int64(9)).Return(nil, nil)
+		_, err := f.svc.Transition(context.Background(), custID, model.ParentInvoice, 9, model.StatusVoid)
+		require.NoError(t, err)
+	})
+
 	t.Run("open estimate is accepted", func(t *testing.T) {
 		f := newDocFixture(t)
 		f.docs.EXPECT().GetForUpdate(mock.Anything, custID, model.ParentEstimate, int64(4)).

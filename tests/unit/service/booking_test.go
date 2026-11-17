@@ -116,9 +116,11 @@ func TestBook(t *testing.T) {
 
 func TestCancelBooking(t *testing.T) {
 	cancelledAt := time.Date(2026, 11, 11, 9, 0, 0, 0, time.UTC)
-	live := model.Booking{ID: 8, CustomerID: custID, Estimate: model.BillingDocument{ID: 41}}
+	live := model.Booking{ID: 8, CustomerID: custID, Estimate: model.BillingDocument{ID: 41}, StartsAt: fixedNow().Add(24 * time.Hour)}
 	cancelled := live
 	cancelled.CancelledAt = &cancelledAt
+	started := live
+	started.StartsAt = fixedNow().Add(-time.Hour)
 
 	tests := []struct {
 		name      string
@@ -131,6 +133,7 @@ func TestCancelBooking(t *testing.T) {
 	}{
 		{"not the customer's booking", live, model.ErrNotFound, model.BillingDocument{}, false, model.ErrNotFound, false},
 		{"already cancelled", cancelled, nil, model.BillingDocument{}, false, model.ErrConflict, false},
+		{"already started", started, nil, model.BillingDocument{}, false, model.ErrConflict, false},
 		{"estimate already declined", live, nil, model.BillingDocument{ID: 41, Status: model.StatusDeclined}, false, model.ErrConflict, false},
 		{"estimate became an invoice", live, nil, model.BillingDocument{ID: 41, Status: model.StatusAccepted}, true, model.ErrConflict, false},
 		{"open estimate", live, nil, model.BillingDocument{ID: 41, Status: model.StatusOpen}, false, nil, true},
@@ -140,7 +143,7 @@ func TestCancelBooking(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := newBookingFixture(t)
 			f.docs.EXPECT().GetBooking(mock.Anything, custID, int64(8)).Return(tt.booking, tt.getErr).Once()
-			if tt.getErr == nil && tt.booking.CancelledAt == nil {
+			if tt.getErr == nil && tt.booking.CancelledAt == nil && tt.booking.StartsAt.After(fixedNow()) {
 				f.docs.EXPECT().GetForUpdate(mock.Anything, custID, model.ParentEstimate, int64(41)).Return(tt.estimate, nil)
 			}
 			if tt.estimate.Status == model.StatusOpen || tt.estimate.Status == model.StatusAccepted {

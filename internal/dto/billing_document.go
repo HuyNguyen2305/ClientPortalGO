@@ -7,8 +7,6 @@ import (
 	"clientportal/internal/model"
 )
 
-const dateLayout = "2006-01-02"
-
 // ItemRequest is one line in a document request. The limits keep totals far from int64 overflow.
 type ItemRequest struct {
 	Name           string  `json:"name" binding:"required,max=200"`
@@ -27,13 +25,13 @@ type DocumentRequest struct {
 
 // ToInput maps the request to a domain input; positions are the slice indexes.
 func (r DocumentRequest) ToInput() (model.DocumentInput, error) {
-	date, err := time.Parse(dateLayout, r.DocumentDate)
+	date, err := time.Parse(time.DateOnly, r.DocumentDate)
 	if err != nil {
 		return model.DocumentInput{}, fmt.Errorf("%w: document_date must be YYYY-MM-DD", model.ErrValidation)
 	}
 	items := make([]model.Item, len(r.Items))
 	for i, it := range r.Items {
-		items[i] = model.Item{Position: i, Name: it.Name, Description: it.Description, Quantity: it.Quantity, UnitPriceCents: *it.UnitPriceCents}
+		items[i] = model.Item{Name: it.Name, Description: it.Description, Quantity: it.Quantity, UnitPriceCents: *it.UnitPriceCents}
 	}
 	return model.DocumentInput{LocationID: r.LocationID, Title: r.Title, DocumentDate: date, Items: items}, nil
 }
@@ -70,7 +68,7 @@ func FromDocument(d model.BillingDocument, withItems bool) DocumentResponse {
 		Number:       d.Number,
 		Status:       string(d.Status),
 		Title:        d.Title,
-		DocumentDate: d.DocumentDate.Format(dateLayout),
+		DocumentDate: d.DocumentDate.Format(time.DateOnly),
 		Location:     FromLocation(d.Location),
 		// shortcut: subtotal equals total until tax or discounts exist; split them when they do.
 		SubtotalCents: d.TotalCents,

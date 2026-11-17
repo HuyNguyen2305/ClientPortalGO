@@ -62,13 +62,11 @@ func ValidStatus(pt ParentType, s Status) bool {
 
 // Item is one line on an invoice or estimate.
 type Item struct {
-	ID                int64
-	BillingDocumentID int64
-	Position          int
-	Name              string
-	Description       *string
-	Quantity          int
-	UnitPriceCents    int64
+	ID             int64
+	Name           string
+	Description    *string
+	Quantity       int
+	UnitPriceCents int64
 }
 
 // TotalCents is the line total.
@@ -114,10 +112,9 @@ func StatusAfterPayment(totalCents, paidCents int64) Status {
 
 // Payment is money received against an invoice.
 type Payment struct {
-	ID                int64
-	BillingDocumentID int64
-	AmountCents       int64
-	PaidAt            time.Time
+	ID          int64
+	AmountCents int64
+	PaidAt      time.Time
 }
 
 // DocumentInput is what a caller supplies to create or replace a document.
