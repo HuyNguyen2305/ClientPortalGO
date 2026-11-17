@@ -133,6 +133,10 @@ func (s *BookingService) Cancel(ctx context.Context, customerID, id int64) (mode
 		if b.CancelledAt != nil {
 			return fmt.Errorf("%w: booking %d is already cancelled", model.ErrConflict, id)
 		}
+		// A visit that took place must stay billable: cancelling would decline its estimate for good.
+		if !b.StartsAt.After(s.now()) {
+			return fmt.Errorf("%w: booking %d has already started", model.ErrConflict, id)
+		}
 		// Lock the estimate first: Convert holds the same lock, so it cannot slip in after the check below.
 		est, err := tx.GetForUpdate(ctx, customerID, model.ParentEstimate, b.Estimate.ID)
 		if err != nil {

@@ -212,6 +212,32 @@ func TestCancelBooking(t *testing.T) {
 	t.Run("an unknown booking is not found", func(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, w.cancel(t, w.customer, 999999).Code)
 	})
+
+	t.Run("a visit that already started cannot be cancelled", func(t *testing.T) {
+		r := w.book(t, w.customer, w.location, "12:00")
+		require.Equal(t, http.StatusCreated, r.code, r.body)
+		_, err := w.app.Pool.Exec(t.Context(),
+			`UPDATE bookings SET starts_at = starts_at - interval '30 days', ends_at = ends_at - interval '30 days' WHERE id = $1`,
+			r.booking.ID)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusConflict, w.cancel(t, w.customer, r.booking.ID).Code)
+	})
+
+	t.Run("voiding the converted invoice cancels the booking and frees its slot", func(t *testing.T) {
+		r := w.book(t, w.customer, w.location, "13:00")
+		require.Equal(t, http.StatusCreated, r.code, r.body)
+		est := fmt.Sprintf("/api/v1/estimates/%d", r.booking.Estimate.ID)
+		require.Equal(t, http.StatusOK, w.app.Do(t, http.MethodPost, est+"/accept", w.customer, nil).Code)
+		rec := w.app.Do(t, http.MethodPost, est+"/convert", w.customer, nil)
+		require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+		inv := testapp.Decode[dto.DocumentResponse](t, rec)
+		rec = w.app.Do(t, http.MethodPost, fmt.Sprintf("/api/v1/invoices/%d/void", inv.ID), w.customer, nil)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		rec = w.app.Do(t, http.MethodGet, fmt.Sprintf("/api/v1/bookings/%d", r.booking.ID), w.customer, nil)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		assert.True(t, testapp.Decode[dto.BookingResponse](t, rec).Cancelled)
+		assert.Contains(t, w.slots(t), "13:00")
+	})
 }
 
 func TestBookingCapPerCustomer(t *testing.T) {

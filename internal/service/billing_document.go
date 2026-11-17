@@ -203,6 +203,10 @@ func (s *BillingDocumentService) Transition(ctx context.Context, customerID int6
 		if pt == model.ParentEstimate && to == model.StatusDeclined {
 			return tx.CancelBookingForEstimate(ctx, id)
 		}
+		// Voiding the invoice of a booked visit cancels the visit too and frees its slot.
+		if pt == model.ParentInvoice && to == model.StatusVoid && doc.ConvertedFromID != nil {
+			return tx.CancelBookingForEstimate(ctx, *doc.ConvertedFromID)
+		}
 		return nil
 	})
 	if err != nil {
@@ -292,7 +296,7 @@ func (s *BillingDocumentService) Convert(ctx context.Context, customerID, estima
 			return err
 		}
 		for i := range items {
-			items[i].ID, items[i].BillingDocumentID = 0, 0
+			items[i].ID = 0
 		}
 		n := s.now() // the clock's own calendar day (the app's clock is business-local), not the UTC one
 		today := time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, time.UTC)

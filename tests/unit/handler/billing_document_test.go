@@ -28,6 +28,7 @@ func docRouter(t *testing.T) http.Handler {
 	hours := model.Hours{Loc: time.UTC, Open: 7 * 60, Close: 17 * 60, Step: 15, HorizonDays: 90}
 	return handler.NewRouter(handler.Deps{
 		Log:       quietLog(),
+		AdminKey:  testAdminKey,
 		Customers: service.NewCustomerService(customers),
 		Locations: service.NewLocationService(locs),
 		Documents: service.NewBillingDocumentService(docs, locs, time.Now),
@@ -45,6 +46,7 @@ func sendAs(r http.Handler, method, path, body string) *httptest.ResponseRecorde
 		req.Header.Set("Content-Type", "application/json")
 	}
 	req.Header.Set("X-Customer-ID", "1")
+	req.Header.Set("X-Admin-Key", testAdminKey)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 	return rec
@@ -101,6 +103,7 @@ func TestPaymentHandler_RejectsOverlongIdempotencyKey(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/invoices/9/payments", strings.NewReader(`{"amount_cents":100}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Customer-ID", "1")
+	req.Header.Set("X-Admin-Key", testAdminKey)
 	req.Header.Set("Idempotency-Key", strings.Repeat("k", 256))
 	rec := httptest.NewRecorder()
 	docRouter(t).ServeHTTP(rec, req) // the mocks fail the test if a repository is called
@@ -115,6 +118,7 @@ func TestBillingDocumentHandler_AcceptsZeroUnitPrice(t *testing.T) {
 	locs.EXPECT().Get(mock.Anything, int64(1), int64(7)).Return(model.Location{}, model.ErrNotFound)
 	r := handler.NewRouter(handler.Deps{
 		Log:       quietLog(),
+		AdminKey:  testAdminKey,
 		Customers: service.NewCustomerService(customers),
 		Locations: service.NewLocationService(locs),
 		Documents: service.NewBillingDocumentService(mocks.NewMockBillingDocumentRepository(t), locs, time.Now),

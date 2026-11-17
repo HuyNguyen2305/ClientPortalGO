@@ -48,14 +48,14 @@ func (r *BillingDocuments) ListPayments(ctx context.Context, documentID int64) (
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 	rows, err := r.db.Query(ctx,
-		`SELECT id, billing_document_id, amount_cents, paid_at
+		`SELECT id, amount_cents, paid_at
 		 FROM payments WHERE billing_document_id = $1 ORDER BY paid_at, id`, documentID)
 	if err != nil {
 		return nil, fmt.Errorf("list payments: %w", err)
 	}
 	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (model.Payment, error) {
 		var p model.Payment
-		err := row.Scan(&p.ID, &p.BillingDocumentID, &p.AmountCents, &p.PaidAt)
+		err := row.Scan(&p.ID, &p.AmountCents, &p.PaidAt)
 		return p, err
 	})
 	if err != nil {

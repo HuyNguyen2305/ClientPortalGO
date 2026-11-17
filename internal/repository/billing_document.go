@@ -122,14 +122,14 @@ func (r *BillingDocuments) ListItems(ctx context.Context, documentID int64) ([]m
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 	rows, err := r.db.Query(ctx,
-		`SELECT id, billing_document_id, position, name, description, quantity, unit_price_cents
+		`SELECT id, name, description, quantity, unit_price_cents
 		 FROM billing_document_items WHERE billing_document_id = $1 ORDER BY position`, documentID)
 	if err != nil {
 		return nil, fmt.Errorf("list items: %w", err)
 	}
 	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (model.Item, error) {
 		var it model.Item
-		err := row.Scan(&it.ID, &it.BillingDocumentID, &it.Position, &it.Name, &it.Description, &it.Quantity, &it.UnitPriceCents)
+		err := row.Scan(&it.ID, &it.Name, &it.Description, &it.Quantity, &it.UnitPriceCents)
 		return it, err
 	})
 	if err != nil {

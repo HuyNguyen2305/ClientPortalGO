@@ -19,8 +19,9 @@ there: accept, convert to invoice, pay.
 - A service has a **name, a duration and a price**, and admins create it.
 - Clients send and receive **business-local** dates and times (`"2026-11-12"`, `"07:00"`); the
   server does all timezone conversion.
-- Admin endpoints have no authentication yet, like the `X-Customer-ID` header; both are known
-  shortcuts to replace with real auth before going public.
+- Admin endpoints need the `X-Admin-Key` header (one shared static key). It and the
+  unauthenticated `X-Customer-ID` header are known shortcuts to replace with real auth before
+  going public.
 
 ## 1. Data model
 
@@ -79,7 +80,8 @@ Config (all optional, with defaults):
      the answer is 409.
 - **Cancelling:** declining the estimate (`POST /estimates/:id/decline`) sets the booking's
   `cancelled_at` in the same transaction. Accepting or converting leaves the booking alone.
-  There is no separate cancel endpoint and no rescheduling (decline and book again).
+  `POST /bookings/:id/cancel` cancels the booking and declines its estimate while the estimate
+  is open or accepted and not yet converted. There is no rescheduling (cancel and book again).
 
 ## 3. API
 
@@ -123,6 +125,7 @@ the price is from 0 to 10,000,000,000. Response: the same fields plus `id`.
 | `POST /bookings` | confirm; 201 with the booking |
 | `GET /bookings` | the customer's live bookings that have not ended, soonest first; not paginated |
 | `GET /bookings/:id` | one of the customer's bookings, cancelled or not |
+| `POST /bookings/:id/cancel` | cancel a live booking and decline its estimate; 409 once it became an invoice |
 
 Request: `{"service_id": 1, "location_id": 3, "date": "2026-11-13", "time": "07:00"}`.
 

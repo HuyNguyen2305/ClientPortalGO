@@ -51,10 +51,13 @@ func NewRouter(d Deps) *gin.Engine {
 	admin.DELETE("/services/:id", services.delete)
 
 	// Everything below acts for the customer named in X-Customer-ID.
-	scoped := api.Group("", middleware.RequireCustomer(func(ctx context.Context, id int64) error {
+	requireCustomer := middleware.RequireCustomer(func(ctx context.Context, id int64) error {
 		_, err := d.Customers.Get(ctx, id)
 		return err
-	}, RespondError))
+	}, RespondError)
+	scoped := api.Group("", requireCustomer)
+	// Document writes change what a customer owes, so they need the admin key as well.
+	staff := admin.Group("", requireCustomer)
 
 	locations := locationHandler{svc: d.Locations}
 	scoped.POST("/locations", locations.create)
@@ -64,28 +67,29 @@ func NewRouter(d Deps) *gin.Engine {
 	scoped.DELETE("/locations/:id", locations.delete)
 
 	// Invoices and estimates share one handler type, fixed to a parent type per route group.
-	docGroup := func(path string, pt model.ParentType) (*gin.RouterGroup, *BillingDocumentHandler) {
-		h := NewBillingDocumentHandler(d.Documents, pt)
-		g := scoped.Group(path)
-		g.GET("", h.List)
-		g.POST("", h.Create)
-		g.GET("/:id", h.Get)
-		g.PUT("/:id", h.Update)
-		g.DELETE("/:id", h.Delete)
-		g.POST("/:id/send", h.Transition(model.StatusOpen))
-		return g, h
+	// read is the customer's own group; write is the staff group on the same path.
+	docGroup := func(path string, pt model.ParentType) (read, write *gin.RouterGroup, h *BillingDocumentHandler) {
+		h = NewBillingDocumentHandler(d.Documents, pt)
+		read, write = scoped.Group(path), staff.Group(path)
+		read.GET("", h.List)
+		read.GET("/:id", h.Get)
+		write.POST("", h.Create)
+		write.PUT("/:id", h.Update)
+		write.DELETE("/:id", h.Delete)
+		write.POST("/:id/send", h.Transition(model.StatusOpen))
+		return read, write, h
 	}
 
-	invoices, inv := docGroup("/invoices", model.ParentInvoice)
-	invoices.POST("/:id/void", inv.Transition(model.StatusVoid))
-	invoices.POST("/:id/payments", inv.RecordPayment)
+	invoices, invoiceWrites, inv := docGroup("/invoices", model.ParentInvoice)
+	invoiceWrites.POST("/:id/void", inv.Transition(model.StatusVoid))
+	invoiceWrites.POST("/:id/payments", inv.RecordPayment)
 	invoices.GET("/:id/payments", inv.ListPayments)
 	scoped.GET("/balance", inv.Balance)
 
-	estimates, est := docGroup("/estimates", model.ParentEstimate)
+	estimates, estimateWrites, est := docGroup("/estimates", model.ParentEstimate)
 	estimates.POST("/:id/accept", est.Transition(model.StatusAccepted))
 	estimates.POST("/:id/decline", est.Transition(model.StatusDeclined))
-	estimates.POST("/:id/convert", est.Convert)
+	estimateWrites.POST("/:id/convert", est.Convert)
 
 	bookings := bookingHandler{svc: d.Bookings}
 	scoped.GET("/booking/days", bookings.days)

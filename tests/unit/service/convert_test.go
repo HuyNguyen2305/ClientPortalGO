@@ -40,8 +40,8 @@ func TestConvert(t *testing.T) {
 	t.Run("accepted estimate becomes a draft invoice", func(t *testing.T) {
 		f := newDocFixture(t)
 		items := []model.Item{
-			{ID: 50, BillingDocumentID: 4, Name: "Service", Quantity: 2, UnitPriceCents: 6500},
-			{ID: 51, BillingDocumentID: 4, Name: "Bait", Position: 1, Quantity: 3, UnitPriceCents: 100},
+			{ID: 50, Name: "Service", Quantity: 2, UnitPriceCents: 6500},
+			{ID: 51, Name: "Bait", Quantity: 3, UnitPriceCents: 100},
 		}
 		f.docs.EXPECT().GetForUpdate(mock.Anything, custID, model.ParentEstimate, int64(4)).Return(acceptedEstimate(), nil)
 		f.docs.EXPECT().ListItems(mock.Anything, int64(4)).Return(items, nil).Once()

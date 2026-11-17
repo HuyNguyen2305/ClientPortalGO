@@ -143,7 +143,8 @@ The service layer enforces all transitions. An invalid one answers HTTP 409.
 
 All routes are under `/api/v1` and speak JSON. Every route except `/healthz` and `/customers`
 requires `X-Customer-ID` and touches only that customer's rows. A record that belongs to another
-customer answers 404, the same as one that does not exist.
+customer answers 404, the same as one that does not exist. Routes that change what a customer
+owes (create, update, delete, send, void, record payment, convert) also need `X-Admin-Key`.
 
 ### Customers (no header)
 

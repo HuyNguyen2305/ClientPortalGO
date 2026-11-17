@@ -9,7 +9,6 @@ import (
 	"clientportal/internal/service"
 )
 
-// shortcut: admin routes have no authentication, same as X-Customer-ID; add admin auth before going public.
 type serviceHandler struct {
 	svc *service.Catalog
 }

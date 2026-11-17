@@ -1,7 +1,5 @@
 .env
 /bin/
 .superpowers/
-.claude/
-CLAUDE.md
 .obsidian/
 graphify-out/

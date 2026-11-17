@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-const cursorDateLayout = "2006-01-02"
-
 // DocumentCursor marks the last row of a page in (document_date DESC, id DESC) order.
 type DocumentCursor struct {
 	Date time.Time
@@ -18,7 +16,7 @@ type DocumentCursor struct {
 
 // Encode returns the opaque string handed to clients.
 func (c DocumentCursor) Encode() string {
-	raw := c.Date.Format(cursorDateLayout) + "|" + strconv.FormatInt(c.ID, 10)
+	raw := c.Date.Format(time.DateOnly) + "|" + strconv.FormatInt(c.ID, 10)
 	return base64.RawURLEncoding.EncodeToString([]byte(raw))
 }
 
@@ -33,7 +31,7 @@ func DecodeCursor(s string) (DocumentCursor, error) {
 	if !ok {
 		return DocumentCursor{}, invalid
 	}
-	date, err := time.Parse(cursorDateLayout, datePart)
+	date, err := time.Parse(time.DateOnly, datePart)
 	if err != nil {
 		return DocumentCursor{}, invalid
 	}
