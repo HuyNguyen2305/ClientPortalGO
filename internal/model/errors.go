@@ -9,7 +9,8 @@ var (
 	ErrConflict   = errors.New("conflict")
 	ErrValidation = errors.New("invalid request")
 
-	ErrUnauthorized = errors.New("unauthorized")
+	ErrUnauthorized    = errors.New("unauthorized")
+	ErrTooManyRequests = errors.New("too many requests")
 
 	// ErrPaymentFailed is a card charge that did not go through: declined, or needing extra bank confirmation.
 	ErrPaymentFailed = errors.New("payment failed")

@@ -12,7 +12,7 @@ import (
 )
 
 func TestLoad(t *testing.T) {
-	keys := []string{"DATABASE_URL", "ADMIN_API_KEY", "PORT", "DB_MAX_CONNS", "QUERY_TIMEOUT", "BOOKING_MAX_LIVE"}
+	keys := []string{"DATABASE_URL", "ADMIN_API_KEY", "PORT", "DB_MAX_CONNS", "QUERY_TIMEOUT", "BOOKING_MAX_LIVE", "SESSION_TTL"}
 	tests := []struct {
 		name    string
 		env     map[string]string
@@ -20,9 +20,11 @@ func TestLoad(t *testing.T) {
 		wantErr bool
 	}{
 		{"defaults", map[string]string{"DATABASE_URL": "postgres://x", "ADMIN_API_KEY": "k"},
-			config.Config{DatabaseURL: "postgres://x", AdminAPIKey: "k", Port: "8080", DBMaxConns: 10, QueryTimeout: 5 * time.Second, MaxLiveBookings: 3}, false},
-		{"overrides", map[string]string{"DATABASE_URL": "postgres://x", "ADMIN_API_KEY": "k", "PORT": "9000", "DB_MAX_CONNS": "25", "QUERY_TIMEOUT": "2s", "BOOKING_MAX_LIVE": "5"},
-			config.Config{DatabaseURL: "postgres://x", AdminAPIKey: "k", Port: "9000", DBMaxConns: 25, QueryTimeout: 2 * time.Second, MaxLiveBookings: 5}, false},
+			config.Config{DatabaseURL: "postgres://x", AdminAPIKey: "k", Port: "8080", DBMaxConns: 10, QueryTimeout: 5 * time.Second, SessionTTL: 720 * time.Hour, MaxLiveBookings: 3}, false},
+		{"overrides", map[string]string{"DATABASE_URL": "postgres://x", "ADMIN_API_KEY": "k", "PORT": "9000", "DB_MAX_CONNS": "25", "QUERY_TIMEOUT": "2s", "BOOKING_MAX_LIVE": "5", "SESSION_TTL": "1h"},
+			config.Config{DatabaseURL: "postgres://x", AdminAPIKey: "k", Port: "9000", DBMaxConns: 25, QueryTimeout: 2 * time.Second, SessionTTL: time.Hour, MaxLiveBookings: 5}, false},
+		{"bad session ttl", map[string]string{"DATABASE_URL": "postgres://x", "ADMIN_API_KEY": "k", "SESSION_TTL": "forever"}, config.Config{}, true},
+		{"zero session ttl", map[string]string{"DATABASE_URL": "postgres://x", "ADMIN_API_KEY": "k", "SESSION_TTL": "0s"}, config.Config{}, true},
 		{"zero booking cap", map[string]string{"DATABASE_URL": "postgres://x", "ADMIN_API_KEY": "k", "BOOKING_MAX_LIVE": "0"}, config.Config{}, true},
 		{"missing database url", map[string]string{"ADMIN_API_KEY": "k"}, config.Config{}, true},
 		{"missing admin key", map[string]string{"DATABASE_URL": "postgres://x"}, config.Config{}, true},
