@@ -42,6 +42,33 @@ func (h authHandler) login(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.FromAuth(cust, token, expires))
 }
 
+// requestReset answers 202 whether or not the address is registered.
+func (h authHandler) requestReset(c *gin.Context) {
+	var req dto.RequestResetRequest
+	if err := bindJSON(c, &req); err != nil {
+		RespondError(c, err)
+		return
+	}
+	if err := h.svc.RequestReset(c.Request.Context(), req.Email); err != nil {
+		RespondError(c, err)
+		return
+	}
+	c.Status(http.StatusAccepted)
+}
+
+func (h authHandler) confirmReset(c *gin.Context) {
+	var req dto.ConfirmResetRequest
+	if err := bindJSON(c, &req); err != nil {
+		RespondError(c, err)
+		return
+	}
+	if err := h.svc.ConfirmReset(c.Request.Context(), req.Token, req.NewPassword); err != nil {
+		RespondError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 func (h authHandler) logout(c *gin.Context) {
 	if err := h.svc.Logout(c.Request.Context(), middleware.Token(c)); err != nil {
 		RespondError(c, err)

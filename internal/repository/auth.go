@@ -98,6 +98,37 @@ func (r *Auth) DeleteSession(ctx context.Context, tokenHash []byte) error {
 	return nil
 }
 
+// CreateReset stores a reset token, replacing any earlier one for the customer so only the newest link works.
+func (r *Auth) CreateReset(ctx context.Context, customerID int64, tokenHash []byte, expiresAt time.Time) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	_, err := r.db.Exec(ctx,
+		`WITH purge AS (DELETE FROM password_resets WHERE customer_id = $1)
+		 INSERT INTO password_resets (token_hash, customer_id, expires_at) VALUES ($2, $1, $3)`,
+		customerID, tokenHash, expiresAt)
+	if err != nil {
+		return fmt.Errorf("insert password reset: %w", mapErr(err))
+	}
+	return nil
+}
+
+// ConsumeReset spends an unexpired reset token, sets the new hash and ends all of that customer's
+// sessions, in one statement so a token works once and nothing is half done. A bad or spent token is ErrNotFound.
+func (r *Auth) ConsumeReset(ctx context.Context, tokenHash []byte, hash string) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	var id int64
+	err := r.db.QueryRow(ctx,
+		`WITH used AS (DELETE FROM password_resets WHERE token_hash = $1 AND expires_at > now() RETURNING customer_id),
+		      upd  AS (UPDATE customers SET password_hash = $2, updated_at = now() WHERE id IN (SELECT customer_id FROM used)),
+		      ended AS (DELETE FROM sessions WHERE customer_id IN (SELECT customer_id FROM used))
+		 SELECT customer_id FROM used`, tokenHash, hash).Scan(&id)
+	if err != nil {
+		return fmt.Errorf("consume password reset: %w", mapErr(err))
+	}
+	return nil
+}
+
 // ChangePassword sets a new hash and ends every session except keep, in one statement so both happen or neither.
 func (r *Auth) ChangePassword(ctx context.Context, id int64, hash string, keep []byte) error {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)

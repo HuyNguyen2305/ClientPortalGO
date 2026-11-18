@@ -21,7 +21,12 @@ type Config struct {
 	QueryTimeout time.Duration
 	// SessionTTL is how long a login stays valid.
 	SessionTTL time.Duration
-	Hours      model.Hours
+	// MailAPIKey switches reset emails from the log to the mail provider; MailFrom is the sender address.
+	MailAPIKey string
+	MailFrom   string
+	// ResetURLBase is the front-end page a reset email links to; the token is appended as ?token=.
+	ResetURLBase string
+	Hours        model.Hours
 	// MaxLiveBookings is how many upcoming bookings one customer may hold.
 	MaxLiveBookings int
 }
@@ -35,6 +40,9 @@ func Load() (Config, error) {
 		DBMaxConns:   10,
 		QueryTimeout: 5 * time.Second,
 		SessionTTL:   30 * 24 * time.Hour,
+		MailAPIKey:   os.Getenv("MAIL_API_KEY"),
+		MailFrom:     os.Getenv("MAIL_FROM"),
+		ResetURLBase: envOr("RESET_URL_BASE", "http://localhost:3000/reset-password"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
@@ -58,6 +66,9 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("QUERY_TIMEOUT must be a positive duration, got %q", v)
 		}
 		cfg.QueryTimeout = d
+	}
+	if cfg.MailAPIKey != "" && cfg.MailFrom == "" {
+		return Config{}, errors.New("MAIL_FROM is required when MAIL_API_KEY is set")
 	}
 	if v := os.Getenv("SESSION_TTL"); v != "" {
 		d, err := time.ParseDuration(v)

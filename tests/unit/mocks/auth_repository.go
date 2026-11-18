@@ -117,6 +117,138 @@ func (_c *MockAuthRepository_ChangePassword_Call) RunAndReturn(run func(ctx cont
 	return _c
 }
 
+// ConsumeReset provides a mock function for the type MockAuthRepository
+func (_mock *MockAuthRepository) ConsumeReset(ctx context.Context, tokenHash []byte, hash string) error {
+	ret := _mock.Called(ctx, tokenHash, hash)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ConsumeReset")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, string) error); ok {
+		r0 = returnFunc(ctx, tokenHash, hash)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockAuthRepository_ConsumeReset_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ConsumeReset'
+type MockAuthRepository_ConsumeReset_Call struct {
+	*mock.Call
+}
+
+// ConsumeReset is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tokenHash []byte
+//   - hash string
+func (_e *MockAuthRepository_Expecter) ConsumeReset(ctx any, tokenHash any, hash any) *MockAuthRepository_ConsumeReset_Call {
+	return &MockAuthRepository_ConsumeReset_Call{Call: _e.mock.On("ConsumeReset", ctx, tokenHash, hash)}
+}
+
+func (_c *MockAuthRepository_ConsumeReset_Call) Run(run func(ctx context.Context, tokenHash []byte, hash string)) *MockAuthRepository_ConsumeReset_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []byte
+		if args[1] != nil {
+			arg1 = args[1].([]byte)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockAuthRepository_ConsumeReset_Call) Return(err error) *MockAuthRepository_ConsumeReset_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockAuthRepository_ConsumeReset_Call) RunAndReturn(run func(ctx context.Context, tokenHash []byte, hash string) error) *MockAuthRepository_ConsumeReset_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CreateReset provides a mock function for the type MockAuthRepository
+func (_mock *MockAuthRepository) CreateReset(ctx context.Context, customerID int64, tokenHash []byte, expiresAt time.Time) error {
+	ret := _mock.Called(ctx, customerID, tokenHash, expiresAt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateReset")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, []byte, time.Time) error); ok {
+		r0 = returnFunc(ctx, customerID, tokenHash, expiresAt)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockAuthRepository_CreateReset_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateReset'
+type MockAuthRepository_CreateReset_Call struct {
+	*mock.Call
+}
+
+// CreateReset is a helper method to define mock.On call
+//   - ctx context.Context
+//   - customerID int64
+//   - tokenHash []byte
+//   - expiresAt time.Time
+func (_e *MockAuthRepository_Expecter) CreateReset(ctx any, customerID any, tokenHash any, expiresAt any) *MockAuthRepository_CreateReset_Call {
+	return &MockAuthRepository_CreateReset_Call{Call: _e.mock.On("CreateReset", ctx, customerID, tokenHash, expiresAt)}
+}
+
+func (_c *MockAuthRepository_CreateReset_Call) Run(run func(ctx context.Context, customerID int64, tokenHash []byte, expiresAt time.Time)) *MockAuthRepository_CreateReset_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 []byte
+		if args[2] != nil {
+			arg2 = args[2].([]byte)
+		}
+		var arg3 time.Time
+		if args[3] != nil {
+			arg3 = args[3].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockAuthRepository_CreateReset_Call) Return(err error) *MockAuthRepository_CreateReset_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockAuthRepository_CreateReset_Call) RunAndReturn(run func(ctx context.Context, customerID int64, tokenHash []byte, expiresAt time.Time) error) *MockAuthRepository_CreateReset_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateSession provides a mock function for the type MockAuthRepository
 func (_mock *MockAuthRepository) CreateSession(ctx context.Context, customerID int64, tokenHash []byte, expiresAt time.Time) error {
 	ret := _mock.Called(ctx, customerID, tokenHash, expiresAt)

@@ -26,6 +26,17 @@ type ChangePasswordRequest struct {
 	NewPassword string `json:"new_password" binding:"required"`
 }
 
+// RequestResetRequest is the body for asking for a reset email.
+type RequestResetRequest struct {
+	Email string `json:"email" binding:"required,max=320"`
+}
+
+// ConfirmResetRequest is the body for setting a new password from a reset link.
+type ConfirmResetRequest struct {
+	Token       string `json:"token" binding:"required,max=200"`
+	NewPassword string `json:"new_password" binding:"required"`
+}
+
 // AuthResponse is what register and login return: the bearer token and who it belongs to.
 type AuthResponse struct {
 	Token     string           `json:"token"`

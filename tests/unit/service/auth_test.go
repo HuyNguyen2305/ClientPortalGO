@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,8 +19,14 @@ import (
 
 var authNow = time.Date(2026, 11, 18, 12, 0, 0, 0, time.UTC)
 
+const resetURL = "https://portal.test/reset"
+
 func newAuth(repo service.AuthRepository) *service.AuthService {
-	return service.NewAuthService(repo, time.Hour, func() time.Time { return authNow })
+	return newAuthWithMail(repo, nil)
+}
+
+func newAuthWithMail(repo service.AuthRepository, mailer service.Mailer) *service.AuthService {
+	return service.NewAuthService(repo, mailer, resetURL, time.Hour, func() time.Time { return authNow })
 }
 
 func hashOf(t *testing.T, pw string) string {
@@ -182,4 +189,71 @@ func TestAuthService_ChangePassword(t *testing.T) {
 		err := newAuth(mocks.NewMockAuthRepository(t)).ChangePassword(context.Background(), 4, "tok", "correct horse", "short")
 		assert.ErrorIs(t, err, model.ErrValidation)
 	})
+}
+
+func TestAuthService_RequestReset(t *testing.T) {
+	t.Run("unknown email sends nothing and says nothing", func(t *testing.T) {
+		repo := mocks.NewMockAuthRepository(t)
+		repo.EXPECT().Credentials(mock.Anything, "nobody@example.com").Return(model.Customer{}, "", model.ErrNotFound)
+		assert.NoError(t, newAuthWithMail(repo, mocks.NewMockMailer(t)).RequestReset(context.Background(), "nobody@example.com"))
+	})
+
+	t.Run("known email stores a token and mails the link", func(t *testing.T) {
+		repo := mocks.NewMockAuthRepository(t)
+		repo.EXPECT().Credentials(mock.Anything, "ada@example.com").Return(model.Customer{ID: 4}, "", nil)
+		repo.EXPECT().CreateReset(mock.Anything, int64(4), mock.Anything, authNow.Add(time.Hour)).Return(nil)
+		mailer := mocks.NewMockMailer(t)
+		mailer.EXPECT().Send(mock.Anything, "ada@example.com", mock.Anything, mock.MatchedBy(func(body string) bool {
+			return strings.Contains(body, resetURL+"?token=")
+		})).Return(nil)
+		assert.NoError(t, newAuthWithMail(repo, mailer).RequestReset(context.Background(), "ada@example.com"))
+	})
+
+	t.Run("a mail failure is swallowed", func(t *testing.T) {
+		repo := mocks.NewMockAuthRepository(t)
+		repo.EXPECT().Credentials(mock.Anything, mock.Anything).Return(model.Customer{ID: 4}, "", nil)
+		repo.EXPECT().CreateReset(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mailer := mocks.NewMockMailer(t)
+		mailer.EXPECT().Send(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("provider down"))
+		assert.NoError(t, newAuthWithMail(repo, mailer).RequestReset(context.Background(), "ada@example.com"))
+	})
+
+	t.Run("a repository failure is returned and nothing is mailed", func(t *testing.T) {
+		boom := errors.New("db down")
+		repo := mocks.NewMockAuthRepository(t)
+		repo.EXPECT().Credentials(mock.Anything, mock.Anything).Return(model.Customer{ID: 4}, "", nil)
+		repo.EXPECT().CreateReset(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(boom)
+		err := newAuthWithMail(repo, mocks.NewMockMailer(t)).RequestReset(context.Background(), "ada@example.com")
+		assert.ErrorIs(t, err, boom)
+	})
+}
+
+func TestAuthService_ConfirmReset(t *testing.T) {
+	tests := []struct {
+		name     string
+		password string
+		repoErr  error
+		callRepo bool
+		wantErr  error
+	}{
+		{"ok", "brand new pass", nil, true, nil},
+		{"short password never reaches the repository", "short", nil, false, model.ErrValidation},
+		{"bad or spent token", "brand new pass", model.ErrNotFound, true, model.ErrValidation},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := mocks.NewMockAuthRepository(t)
+			if tt.callRepo {
+				repo.EXPECT().ConsumeReset(mock.Anything, mock.Anything, mock.MatchedBy(func(h string) bool {
+					return bcrypt.CompareHashAndPassword([]byte(h), []byte(tt.password)) == nil
+				})).Return(tt.repoErr)
+			}
+			err := newAuth(repo).ConfirmReset(context.Background(), "tok", tt.password)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
 }
