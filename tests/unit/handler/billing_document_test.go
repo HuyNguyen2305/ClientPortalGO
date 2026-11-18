@@ -17,8 +17,15 @@ import (
 	"clientportal/tests/unit/mocks"
 )
 
-// docRouter builds the router with every repository mocked. Only the customer lookup in the
-// header middleware may be called; any other repository call fails the test.
+// authAsCustomer1 is an auth service that accepts any bearer token as customer 1.
+func authAsCustomer1(t *testing.T) *service.AuthService {
+	repo := mocks.NewMockAuthRepository(t)
+	repo.EXPECT().CustomerIDByToken(mock.Anything, mock.Anything).Return(1, nil).Maybe()
+	return service.NewAuthService(repo, time.Hour, time.Now)
+}
+
+// docRouter builds the router with every repository mocked. Only the customer and session
+// lookups in the auth middleware may be called; any other repository call fails the test.
 func docRouter(t *testing.T) http.Handler {
 	customers := mocks.NewMockCustomerRepository(t)
 	customers.EXPECT().Get(mock.Anything, int64(1)).Return(model.Customer{ID: 1}, nil).Maybe()
@@ -30,6 +37,7 @@ func docRouter(t *testing.T) http.Handler {
 		Log:       quietLog(),
 		AdminKey:  testAdminKey,
 		Customers: service.NewCustomerService(customers),
+		Auth:      authAsCustomer1(t),
 		Locations: service.NewLocationService(locs),
 		Documents: service.NewBillingDocumentService(docs, locs, time.Now),
 		Catalog:   service.NewCatalog(services),
@@ -46,6 +54,7 @@ func sendAs(r http.Handler, method, path, body string) *httptest.ResponseRecorde
 		req.Header.Set("Content-Type", "application/json")
 	}
 	req.Header.Set("X-Customer-ID", "1")
+	req.Header.Set("Authorization", "Bearer test-token")
 	req.Header.Set("X-Admin-Key", testAdminKey)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
@@ -120,6 +129,7 @@ func TestBillingDocumentHandler_AcceptsZeroUnitPrice(t *testing.T) {
 		Log:       quietLog(),
 		AdminKey:  testAdminKey,
 		Customers: service.NewCustomerService(customers),
+		Auth:      authAsCustomer1(t),
 		Locations: service.NewLocationService(locs),
 		Documents: service.NewBillingDocumentService(mocks.NewMockBillingDocumentRepository(t), locs, time.Now),
 	})

@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -17,6 +18,7 @@ type Deps struct {
 	AdminKey  string
 	Ping      func(context.Context) error
 	Customers *service.CustomerService
+	Auth      *service.AuthService
 	Locations *service.LocationService
 	Documents *service.BillingDocumentService
 	Catalog   *service.Catalog
@@ -50,13 +52,22 @@ func NewRouter(d Deps) *gin.Engine {
 	admin.PUT("/services/:id", services.update)
 	admin.DELETE("/services/:id", services.delete)
 
-	// Everything below acts for the customer named in X-Customer-ID.
+	// Customers register and log in without a token; the limiter slows password guessing.
+	auth := authHandler{svc: d.Auth}
+	limit := middleware.RateLimit(10, time.Minute, RespondError)
+	api.POST("/auth/register", limit, auth.register)
+	api.POST("/auth/login", limit, auth.login)
+
+	// Customer routes act for the owner of the bearer token.
+	scoped := api.Group("", middleware.RequireSession(d.Auth.Authenticate, RespondError))
+	scoped.POST("/auth/logout", auth.logout)
+	scoped.POST("/auth/password", auth.changePassword)
+
+	// Document writes change what a customer owes: staff send the admin key and name the customer in X-Customer-ID.
 	requireCustomer := middleware.RequireCustomer(func(ctx context.Context, id int64) error {
 		_, err := d.Customers.Get(ctx, id)
 		return err
 	}, RespondError)
-	scoped := api.Group("", requireCustomer)
-	// Document writes change what a customer owes, so they need the admin key as well.
 	staff := admin.Group("", requireCustomer)
 
 	locations := locationHandler{svc: d.Locations}

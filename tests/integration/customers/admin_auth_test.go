@@ -5,9 +5,9 @@ package customers_test
 import (
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,8 +56,9 @@ func TestAdminRoutesNeedKey(t *testing.T) {
 	// A customer still reads their own invoices without the key.
 	created := app.Do(t, http.MethodPost, "/api/v1/customers", 0, map[string]any{"name": "A"})
 	require.Equal(t, http.StatusCreated, created.Code)
+	id := testapp.Decode[dto.CustomerResponse](t, created).ID
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/invoices", nil)
-	req.Header.Set("X-Customer-ID", strconv.FormatInt(testapp.Decode[dto.CustomerResponse](t, created).ID, 10))
+	req.Header.Set("Authorization", "Bearer "+app.Session(t, id, time.Hour))
 	rec = httptest.NewRecorder()
 	app.Handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)

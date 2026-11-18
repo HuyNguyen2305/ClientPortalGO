@@ -19,7 +19,9 @@ type Config struct {
 	Port         string
 	DBMaxConns   int32
 	QueryTimeout time.Duration
-	Hours        model.Hours
+	// SessionTTL is how long a login stays valid.
+	SessionTTL time.Duration
+	Hours      model.Hours
 	// MaxLiveBookings is how many upcoming bookings one customer may hold.
 	MaxLiveBookings int
 }
@@ -32,6 +34,7 @@ func Load() (Config, error) {
 		Port:         "8080",
 		DBMaxConns:   10,
 		QueryTimeout: 5 * time.Second,
+		SessionTTL:   30 * 24 * time.Hour,
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
@@ -55,6 +58,13 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("QUERY_TIMEOUT must be a positive duration, got %q", v)
 		}
 		cfg.QueryTimeout = d
+	}
+	if v := os.Getenv("SESSION_TTL"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil || d <= 0 {
+			return Config{}, fmt.Errorf("SESSION_TTL must be a positive duration, got %q", v)
+		}
+		cfg.SessionTTL = d
 	}
 	hours, err := loadHours()
 	if err != nil {

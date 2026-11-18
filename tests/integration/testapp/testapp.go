@@ -6,6 +6,9 @@ package testapp
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -48,7 +51,7 @@ func New(t *testing.T) *App {
 	gin.SetMode(gin.TestMode)
 	pool := testdb.New(t)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	cfg := config.Config{AdminAPIKey: AdminKey, QueryTimeout: 5 * time.Second, Hours: Hours, MaxLiveBookings: 3}
+	cfg := config.Config{AdminAPIKey: AdminKey, QueryTimeout: 5 * time.Second, SessionTTL: time.Hour, Hours: Hours, MaxLiveBookings: 3}
 	gw := &FakeGateway{Cards: map[string][]model.Card{}, Charges: map[string]int64{}}
 	return &App{Handler: app.New(pool, cfg, log, gw), Pool: pool, Gateway: gw}
 }
@@ -127,11 +130,32 @@ func (a *App) DoWith(t *testing.T, method, path string, customerID int64, body a
 		req.Header.Set(k, v)
 	}
 	if customerID != 0 {
+		// Customer routes read the bearer token, staff routes read X-Customer-ID; send both.
 		req.Header.Set("X-Customer-ID", strconv.FormatInt(customerID, 10))
+		req.Header.Set("Authorization", "Bearer "+a.Session(t, customerID, time.Hour))
 	}
 	rec := httptest.NewRecorder()
 	a.Handler.ServeHTTP(rec, req)
 	return rec
+}
+
+// Session inserts a login session for the customer straight into the database and returns its token.
+// A negative ttl makes it already expired.
+func (a *App) Session(t *testing.T, customerID int64, ttl time.Duration) string {
+	t.Helper()
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		t.Fatalf("token: %v", err)
+	}
+	token := base64.RawURLEncoding.EncodeToString(raw)
+	sum := sha256.Sum256([]byte(token))
+	_, err := a.Pool.Exec(context.Background(),
+		`INSERT INTO sessions (token_hash, customer_id, expires_at) VALUES ($1, $2, now() + $3 * interval '1 second')`,
+		sum[:], customerID, int64(ttl/time.Second))
+	if err != nil {
+		t.Fatalf("insert session: %v", err)
+	}
+	return token
 }
 
 // Decode unmarshals the response body.

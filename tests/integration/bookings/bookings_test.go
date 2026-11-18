@@ -304,7 +304,7 @@ func TestBookingRejectsBadRequests(t *testing.T) {
 	rec := w.app.Do(t, http.MethodGet, fmt.Sprintf("/api/v1/services/%d/slots?date=%s", w.service.ID, today), w.customer, nil)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	rec = w.app.Do(t, http.MethodGet, fmt.Sprintf("/api/v1/services/%d/slots?date=%s", w.service.ID, w.day), 0, nil)
-	assert.Equal(t, http.StatusBadRequest, rec.Code, "the header is required")
+	assert.Equal(t, http.StatusUnauthorized, rec.Code, "a token is required")
 }
 
 func TestBookingDays(t *testing.T) {

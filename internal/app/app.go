@@ -34,6 +34,7 @@ func New(pool *pgxpool.Pool, cfg config.Config, log *slog.Logger, gw service.Pay
 		AdminKey:       cfg.AdminAPIKey,
 		Ping:           pool.Ping,
 		Customers:      service.NewCustomerService(customers),
+		Auth:           service.NewAuthService(repository.NewAuth(pool, queryTimeout), cfg.SessionTTL, time.Now),
 		Locations:      service.NewLocationService(locations),
 		Documents:      invoices,
 		Catalog:        service.NewCatalog(services),

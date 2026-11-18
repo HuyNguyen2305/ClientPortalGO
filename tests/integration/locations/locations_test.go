@@ -61,9 +61,10 @@ func TestLocations(t *testing.T) {
 		assert.Equal(t, "New York", testapp.Decode[dto.LocationResponse](t, rec).City)
 	})
 
-	t.Run("header rules", func(t *testing.T) {
-		assert.Equal(t, http.StatusBadRequest, app.Do(t, http.MethodGet, "/api/v1/locations", 0, nil).Code)
-		assert.Equal(t, http.StatusNotFound, app.Do(t, http.MethodGet, "/api/v1/locations", 999999, nil).Code)
+	t.Run("token rules", func(t *testing.T) {
+		assert.Equal(t, http.StatusUnauthorized, app.Do(t, http.MethodGet, "/api/v1/locations", 0, nil).Code)
+		unknown := map[string]string{"Authorization": "Bearer not-a-real-token"}
+		assert.Equal(t, http.StatusUnauthorized, app.DoWith(t, http.MethodGet, "/api/v1/locations", 0, nil, unknown).Code)
 	})
 
 	t.Run("delete blocked by a document", func(t *testing.T) {

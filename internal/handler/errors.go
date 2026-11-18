@@ -20,6 +20,8 @@ func RespondError(c *gin.Context, err error) {
 		status, code, msg = http.StatusBadRequest, "invalid_request", err.Error()
 	case errors.Is(err, model.ErrUnauthorized):
 		status, code, msg = http.StatusUnauthorized, "unauthorized", err.Error()
+	case errors.Is(err, model.ErrTooManyRequests):
+		status, code, msg = http.StatusTooManyRequests, "too_many_requests", err.Error()
 	case errors.Is(err, model.ErrNotFound):
 		// Not the wrapped chain: it names internal operations and row IDs.
 		status, code, msg = http.StatusNotFound, "not_found", model.ErrNotFound.Error()
