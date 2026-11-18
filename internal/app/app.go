@@ -16,7 +16,7 @@ import (
 )
 
 // New returns the HTTP handler for the whole API. gw may be nil, which switches the saved-cards routes off.
-func New(pool *pgxpool.Pool, cfg config.Config, log *slog.Logger, gw service.PaymentGateway) http.Handler {
+func New(pool *pgxpool.Pool, cfg config.Config, log *slog.Logger, gw service.PaymentGateway, mailer service.Mailer) http.Handler {
 	queryTimeout := cfg.QueryTimeout
 	customers := repository.NewCustomers(pool, queryTimeout)
 	locations := repository.NewLocations(pool, queryTimeout)
@@ -34,7 +34,7 @@ func New(pool *pgxpool.Pool, cfg config.Config, log *slog.Logger, gw service.Pay
 		AdminKey:       cfg.AdminAPIKey,
 		Ping:           pool.Ping,
 		Customers:      service.NewCustomerService(customers),
-		Auth:           service.NewAuthService(repository.NewAuth(pool, queryTimeout), cfg.SessionTTL, time.Now),
+		Auth:           service.NewAuthService(repository.NewAuth(pool, queryTimeout), mailer, cfg.ResetURLBase, cfg.SessionTTL, time.Now),
 		Locations:      service.NewLocationService(locations),
 		Documents:      invoices,
 		Catalog:        service.NewCatalog(services),

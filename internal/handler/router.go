@@ -57,6 +57,8 @@ func NewRouter(d Deps) *gin.Engine {
 	limit := middleware.RateLimit(10, time.Minute, RespondError)
 	api.POST("/auth/register", limit, auth.register)
 	api.POST("/auth/login", limit, auth.login)
+	api.POST("/auth/password-reset", limit, auth.requestReset)
+	api.POST("/auth/password-reset/confirm", limit, auth.confirmReset)
 
 	// Customer routes act for the owner of the bearer token.
 	scoped := api.Group("", middleware.RequireSession(d.Auth.Authenticate, RespondError))

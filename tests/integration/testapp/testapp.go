@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +34,35 @@ type App struct {
 	Handler http.Handler
 	Pool    *pgxpool.Pool
 	Gateway *FakeGateway
+	Mailer  *FakeMailer
+}
+
+// Mail is one email the fake mailer was asked to send.
+type Mail struct{ To, Subject, Body string }
+
+// FakeMailer records emails instead of sending them.
+type FakeMailer struct{ Sent []Mail }
+
+func (m *FakeMailer) Send(_ context.Context, to, subject, body string) error {
+	m.Sent = append(m.Sent, Mail{to, subject, body})
+	return nil
+}
+
+// ResetURL is the reset link base the test API puts in emails.
+const ResetURL = "https://portal.test/reset"
+
+// LastToken returns the reset token in the most recent email, failing the test when there is none.
+func (m *FakeMailer) LastToken(t *testing.T) string {
+	t.Helper()
+	if len(m.Sent) == 0 {
+		t.Fatal("no email was sent")
+	}
+	_, token, ok := strings.Cut(m.Sent[len(m.Sent)-1].Body, ResetURL+"?token=")
+	if !ok {
+		t.Fatalf("no reset link in %q", m.Sent[len(m.Sent)-1].Body)
+	}
+	token, _, _ = strings.Cut(token, "\n")
+	return token
 }
 
 // Hours are the opening hours the test API runs with: 07:00 to 17:00 every day, a 15-minute
@@ -51,9 +81,10 @@ func New(t *testing.T) *App {
 	gin.SetMode(gin.TestMode)
 	pool := testdb.New(t)
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	cfg := config.Config{AdminAPIKey: AdminKey, QueryTimeout: 5 * time.Second, SessionTTL: time.Hour, Hours: Hours, MaxLiveBookings: 3}
+	cfg := config.Config{AdminAPIKey: AdminKey, QueryTimeout: 5 * time.Second, SessionTTL: time.Hour, ResetURLBase: ResetURL, Hours: Hours, MaxLiveBookings: 3}
 	gw := &FakeGateway{Cards: map[string][]model.Card{}, Charges: map[string]int64{}}
-	return &App{Handler: app.New(pool, cfg, log, gw), Pool: pool, Gateway: gw}
+	mailer := &FakeMailer{}
+	return &App{Handler: app.New(pool, cfg, log, gw, mailer), Pool: pool, Gateway: gw, Mailer: mailer}
 }
 
 // FakeGateway is an in-memory payment gateway: no network, no Stripe key.

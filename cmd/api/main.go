@@ -16,6 +16,8 @@ import (
 
 	"clientportal/internal/app"
 	"clientportal/internal/config"
+	"clientportal/internal/mail"
+	"clientportal/internal/service"
 )
 
 func main() {
@@ -46,11 +48,16 @@ func run(log *slog.Logger) error {
 	}
 	defer pool.Close()
 
+	var mailer service.Mailer = mail.NewLog(log)
+	if cfg.MailAPIKey != "" {
+		mailer = mail.NewResend(cfg.MailAPIKey, cfg.MailFrom, "https://api.resend.com/emails")
+	}
+
 	gin.SetMode(gin.ReleaseMode)
 	srv := &http.Server{
 		Addr: ":" + cfg.Port,
 		// nil gateway: the real Stripe adapter is not written yet (see PR notes), so the routes stay off.
-		Handler:           app.New(pool, cfg, log, nil),
+		Handler:           app.New(pool, cfg, log, nil, mailer),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,

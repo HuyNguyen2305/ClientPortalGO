@@ -21,7 +21,7 @@ import (
 func authAsCustomer1(t *testing.T) *service.AuthService {
 	repo := mocks.NewMockAuthRepository(t)
 	repo.EXPECT().CustomerIDByToken(mock.Anything, mock.Anything).Return(1, nil).Maybe()
-	return service.NewAuthService(repo, time.Hour, time.Now)
+	return service.NewAuthService(repo, mocks.NewMockMailer(t), "", time.Hour, time.Now)
 }
 
 // docRouter builds the router with every repository mocked. Only the customer and session
