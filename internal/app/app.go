@@ -40,6 +40,7 @@ func New(pool *pgxpool.Pool, cfg config.Config, log *slog.Logger, gw service.Pay
 		Catalog:        service.NewCatalog(services),
 		Bookings:       service.NewBookingService(documents, locations, services, cfg.Hours, cfg.MaxLiveBookings, now),
 		PaymentMethods: paymentMethods,
+		TrustedProxies: cfg.TrustedProxies,
 	})
 }
 

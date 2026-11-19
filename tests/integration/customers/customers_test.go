@@ -90,3 +90,28 @@ func TestCustomers(t *testing.T) {
 		assert.JSONEq(t, `{"data":[]}`, rec.Body.String())
 	})
 }
+
+func TestUpdateWithoutEmailKeepsALoginEmail(t *testing.T) {
+	app := testapp.New(t)
+	rec := app.DoWith(t, http.MethodPost, "/api/v1/auth/register", 0,
+		map[string]any{"name": "Ada", "email": "ada@example.com", "password": "correct horse"}, nil)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	registered := testapp.Decode[dto.AuthResponse](t, rec)
+
+	// A registered customer (has a password): a blank email must not lock them out.
+	path := fmt.Sprintf("/api/v1/customers/%d", registered.Customer.ID)
+	rec = app.Do(t, http.MethodPut, path, 0, map[string]any{"name": "Ada L."})
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.NotNil(t, testapp.Decode[dto.CustomerResponse](t, rec).Email)
+	rec = app.DoWith(t, http.MethodPost, "/api/v1/auth/login", 0,
+		map[string]any{"email": "ada@example.com", "password": "correct horse"}, nil)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	// A staff-created customer has no password, so the email can still be cleared.
+	rec = app.Do(t, http.MethodPost, "/api/v1/customers", 0, map[string]any{"name": "Walk-in", "email": "walkin@example.com"})
+	require.Equal(t, http.StatusCreated, rec.Code)
+	walkin := testapp.Decode[dto.CustomerResponse](t, rec)
+	rec = app.Do(t, http.MethodPut, fmt.Sprintf("/api/v1/customers/%d", walkin.ID), 0, map[string]any{"name": "Walk-in"})
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Nil(t, testapp.Decode[dto.CustomerResponse](t, rec).Email)
+}

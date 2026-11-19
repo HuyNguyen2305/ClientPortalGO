@@ -131,7 +131,7 @@ func TestPaymentMethodService_PayInvoice(t *testing.T) {
 				gw.EXPECT().ListCards(mock.Anything, "cus_1").Return(tt.cards, nil)
 			}
 			if tt.charges {
-				gw.EXPECT().Charge(mock.Anything, "cus_1", "pm_1", int64(5000), "key-1").Return(tt.chargeErr)
+				gw.EXPECT().Charge(mock.Anything, "cus_1", "pm_1", int64(5000), "invoice-9-key-1").Return(tt.chargeErr)
 			}
 			if tt.books {
 				inv.EXPECT().RecordPayment(mock.Anything, int64(3), int64(9), int64(5000), "key-1").
@@ -144,6 +144,24 @@ func TestPaymentMethodService_PayInvoice(t *testing.T) {
 			}
 			require.NoError(t, err)
 		})
+	}
+}
+
+func TestPaymentMethodService_PayInvoice_SameKeyOnTwoInvoicesChargesWithDifferentGatewayKeys(t *testing.T) {
+	links, gw, inv := mocks.NewMockGatewayLinkRepository(t), mocks.NewMockPaymentGateway(t), mocks.NewMockInvoiceBooker(t)
+	links.EXPECT().StripeID(mock.Anything, int64(3)).Return("cus_1", nil)
+	gw.EXPECT().ListCards(mock.Anything, "cus_1").Return([]model.Card{{ID: "pm_1"}}, nil)
+	for _, id := range []int64{9, 10} {
+		open := model.BillingDocument{ID: id, Status: model.StatusOpen, TotalCents: 5000}
+		inv.EXPECT().Get(mock.Anything, int64(3), model.ParentInvoice, id).Return(open, nil)
+		inv.EXPECT().PaymentRecorded(mock.Anything, int64(3), id, "key-1").Return(false, nil)
+		gw.EXPECT().Charge(mock.Anything, "cus_1", "pm_1", int64(5000), fmt.Sprintf("invoice-%d-key-1", id)).Return(nil)
+		inv.EXPECT().RecordPayment(mock.Anything, int64(3), id, int64(5000), "key-1").Return(open, nil)
+	}
+	svc := service.NewPaymentMethodService(links, gw, inv)
+	for _, id := range []int64{9, 10} {
+		_, err := svc.PayInvoice(context.Background(), 3, id, "pm_1", "key-1")
+		require.NoError(t, err)
 	}
 }
 

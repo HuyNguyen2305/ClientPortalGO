@@ -16,6 +16,9 @@ type LocationRepository interface {
 	Delete(ctx context.Context, customerID, id int64) error
 }
 
+// maxLocations bounds GET /locations, which returns every location unpaginated.
+const maxLocations = 50
+
 // LocationService manages a customer's service addresses.
 type LocationService struct {
 	repo LocationRepository
@@ -47,6 +50,14 @@ func (s *LocationService) Create(ctx context.Context, customerID int64, in model
 		return model.Location{}, err
 	}
 	in.CustomerID = customerID
+	// shortcut: count-then-insert, so concurrent creates can overshoot the cap by the number in flight; lock the customer row if that matters.
+	existing, err := s.repo.List(ctx, customerID)
+	if err != nil {
+		return model.Location{}, fmt.Errorf("create location: %w", err)
+	}
+	if len(existing) >= maxLocations {
+		return model.Location{}, fmt.Errorf("%w: a customer can have at most %d locations", model.ErrConflict, maxLocations)
+	}
 	l, err := s.repo.Create(ctx, in)
 	if err != nil {
 		return model.Location{}, fmt.Errorf("create location: %w", err)

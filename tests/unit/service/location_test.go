@@ -34,6 +34,7 @@ func TestLocationService_CreateValidates(t *testing.T) {
 			in := valid
 			tt.mutate(&in)
 			if tt.wantErr == nil {
+				repo.EXPECT().List(mock.Anything, int64(3)).Return(nil, nil)
 				repo.EXPECT().Create(mock.Anything, mock.MatchedBy(func(l model.Location) bool {
 					return l.CustomerID == 3 && l.Street == valid.Street
 				})).Return(model.Location{ID: 1}, nil)
@@ -41,6 +42,33 @@ func TestLocationService_CreateValidates(t *testing.T) {
 			_, err := service.NewLocationService(repo).Create(context.Background(), 3, in)
 			if tt.wantErr != nil {
 				assert.True(t, errors.Is(err, tt.wantErr), "got %v", err)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestLocationService_CreateStopsAtTheCap(t *testing.T) {
+	valid := model.Location{Street: "a", City: "b", State: "c", PostalCode: "d"}
+	tests := []struct {
+		name     string
+		existing int
+		wantErr  error
+	}{
+		{"one below the cap creates", 49, nil},
+		{"at the cap is a conflict", 50, model.ErrConflict},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := mocks.NewMockLocationRepository(t)
+			repo.EXPECT().List(mock.Anything, int64(3)).Return(make([]model.Location, tt.existing), nil)
+			if tt.wantErr == nil {
+				repo.EXPECT().Create(mock.Anything, mock.Anything).Return(model.Location{ID: 1}, nil)
+			}
+			_, err := service.NewLocationService(repo).Create(context.Background(), 3, valid)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
 				return
 			}
 			require.NoError(t, err)

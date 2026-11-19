@@ -135,7 +135,7 @@ func TestPayInvoice(t *testing.T) {
 			assert.Equal(t, "paid", doc.Status)
 			assert.EqualValues(t, 0, *doc.BalanceDueCents)
 		}
-		assert.Equal(t, map[string]int64{"k-1": 6500}, app.Gateway.Charges)
+		assert.Equal(t, map[string]int64{fmt.Sprintf("invoice-%d-k-1", invoice): 6500}, app.Gateway.Charges)
 		assert.Equal(t, 1, payments())
 	})
 

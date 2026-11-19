@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -96,6 +97,33 @@ func TestNewestResetLinkWins(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, confirmReset(t, app, first, newPassword))
 	assert.Equal(t, http.StatusNoContent, confirmReset(t, app, second, newPassword))
+}
+
+func TestResetTokenUsedTwiceAtOnceWorksOnce(t *testing.T) {
+	app := testapp.New(t)
+	register(t, app, "ada@example.com")
+	requestReset(t, app, "ada@example.com")
+	token := app.Mailer.LastToken(t)
+
+	passwords := []string{"first new pass", "second new pass"}
+	codes := make([]int, len(passwords))
+	var wg sync.WaitGroup
+	for i, pw := range passwords {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			codes[i] = app.DoWith(t, http.MethodPost, "/api/v1/auth/password-reset/confirm", 0,
+				map[string]any{"token": token, "new_password": pw}, nil).Code
+		}()
+	}
+	wg.Wait()
+
+	require.ElementsMatch(t, []int{http.StatusNoContent, http.StatusBadRequest}, codes)
+	winner := passwords[0]
+	if codes[1] == http.StatusNoContent {
+		winner = passwords[1]
+	}
+	assert.Equal(t, http.StatusOK, loginCode(t, app, "ada@example.com", winner), "the winner's password is the one stored")
 }
 
 func TestStaffCreatedCustomerCanSetAPasswordByReset(t *testing.T) {

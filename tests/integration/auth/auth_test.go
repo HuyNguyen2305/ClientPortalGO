@@ -149,6 +149,18 @@ func TestChangePassword(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
+func TestChangePasswordIsRateLimited(t *testing.T) {
+	app := testapp.New(t)
+	got := register(t, app, "ada@example.com")
+	var last int
+	for range 12 {
+		last = app.DoWith(t, http.MethodPost, "/api/v1/auth/password", 0,
+			map[string]any{"old_password": "not the password", "new_password": "brand new pass"},
+			map[string]string{"Authorization": "Bearer " + got.Token}).Code
+	}
+	assert.Equal(t, http.StatusTooManyRequests, last)
+}
+
 func TestAuthEndpointsAreRateLimited(t *testing.T) {
 	app := testapp.New(t)
 	var last int

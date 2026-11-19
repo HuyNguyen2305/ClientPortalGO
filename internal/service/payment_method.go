@@ -137,7 +137,8 @@ func (s *PaymentMethodService) PayInvoice(ctx context.Context, customerID, invoi
 		return model.BillingDocument{}, fmt.Errorf("pay invoice: %w", err)
 	}
 	amount := inv.BalanceDueCents()
-	if err := s.gw.Charge(ctx, gid, cardID, amount, key); err != nil {
+	// The gateway's keys are account-wide, so prefix the invoice: one key reused on two invoices must not replay the first charge.
+	if err := s.gw.Charge(ctx, gid, cardID, amount, fmt.Sprintf("invoice-%d-%s", invoiceID, key)); err != nil {
 		return model.BillingDocument{}, fmt.Errorf("charge card: %w", err)
 	}
 	doc, err := s.invoices.RecordPayment(ctx, customerID, invoiceID, amount, key)
