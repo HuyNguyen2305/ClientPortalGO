@@ -72,12 +72,15 @@ func (r *Customers) List(ctx context.Context, afterID int64, limit int) ([]model
 	return out, nil
 }
 
-// Update replaces a customer's name, email and phone.
+// Update replaces a customer's name, email and phone. A blank email keeps the old one when the
+// customer has a password, because the email is their login.
 func (r *Customers) Update(ctx context.Context, c model.Customer) (model.Customer, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 	out, err := scanCustomer(r.db.QueryRow(ctx,
-		`UPDATE customers SET name = $2, email = $3, phone = $4, updated_at = now()
+		`UPDATE customers SET name = $2,
+		        email = CASE WHEN $3::text IS NULL AND password_hash IS NOT NULL THEN email ELSE $3 END,
+		        phone = $4, updated_at = now()
 		 WHERE id = $1 RETURNING `+customerColumns,
 		c.ID, c.Name, c.Email, c.Phone))
 	if err != nil {

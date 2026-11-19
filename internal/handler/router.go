@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -25,12 +26,18 @@ type Deps struct {
 	Bookings  *service.BookingService
 	// PaymentMethods is nil when Stripe is not configured.
 	PaymentMethods *service.PaymentMethodService
+	// TrustedProxies are the proxies whose X-Forwarded-For is believed; nil trusts none, so clients cannot fake their IP.
+	TrustedProxies []string
 }
 
-// NewRouter builds the Gin engine with every route.
+// NewRouter builds the Gin engine with every route. It panics on an invalid TrustedProxies entry: that is a startup misconfiguration.
 func NewRouter(d Deps) *gin.Engine {
 	r := gin.New()
-	r.Use(gin.Recovery(), middleware.Logging(d.Log))
+	if err := r.SetTrustedProxies(d.TrustedProxies); err != nil {
+		panic(fmt.Sprintf("trusted proxies: %v", err))
+	}
+	// A panic answers the standard 500 body and is logged through RespondError like any other failure.
+	r.Use(gin.CustomRecovery(func(c *gin.Context, v any) { RespondError(c, fmt.Errorf("panic: %v", v)) }), middleware.Logging(d.Log))
 	r.GET("/healthz", health(d.Ping))
 
 	api := r.Group("/api/v1")
@@ -63,7 +70,7 @@ func NewRouter(d Deps) *gin.Engine {
 	// Customer routes act for the owner of the bearer token.
 	scoped := api.Group("", middleware.RequireSession(d.Auth.Authenticate, RespondError))
 	scoped.POST("/auth/logout", auth.logout)
-	scoped.POST("/auth/password", auth.changePassword)
+	scoped.POST("/auth/password", limit, auth.changePassword)
 
 	// Document writes change what a customer owes: staff send the admin key and name the customer in X-Customer-ID.
 	requireCustomer := middleware.RequireCustomer(func(ctx context.Context, id int64) error {

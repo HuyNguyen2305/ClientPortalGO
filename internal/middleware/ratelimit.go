@@ -11,8 +11,8 @@ import (
 )
 
 // RateLimit allows each client IP at most limit requests per window.
-// shortcut: in-memory fixed window, so it is per process and resets on restart; gin trusts X-Forwarded-For by default,
-// so set trusted proxies before relying on it; move to a shared store when the API runs on several instances.
+// shortcut: in-memory fixed window, so it is per process and resets on restart; move to a shared store when the API
+// runs on several instances. Behind a reverse proxy, list it in TRUSTED_PROXIES or every client shares one bucket.
 func RateLimit(limit int, window time.Duration, fail func(*gin.Context, error)) gin.HandlerFunc {
 	type bucket struct {
 		start time.Time

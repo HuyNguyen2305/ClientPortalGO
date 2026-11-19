@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 	_ "time/tzdata" // BUSINESS_TZ must resolve on hosts without a zoneinfo database (Windows, scratch images)
 
@@ -26,10 +27,17 @@ type Config struct {
 	MailFrom   string
 	// ResetURLBase is the front-end page a reset email links to; the token is appended as ?token=.
 	ResetURLBase string
-	Hours        model.Hours
+	// AppEnv is "production" or anything else; production refuses to start without a mail provider.
+	AppEnv string
+	// TrustedProxies are the proxy IPs or CIDRs whose X-Forwarded-For header is believed; empty trusts none.
+	TrustedProxies []string
+	Hours          model.Hours
 	// MaxLiveBookings is how many upcoming bookings one customer may hold.
 	MaxLiveBookings int
 }
+
+// minAdminKeyLen rejects placeholder keys such as "change-me".
+const minAdminKeyLen = 32
 
 // Load reads the environment. An empty variable means "use the default".
 func Load() (Config, error) {
@@ -43,12 +51,19 @@ func Load() (Config, error) {
 		MailAPIKey:   os.Getenv("MAIL_API_KEY"),
 		MailFrom:     os.Getenv("MAIL_FROM"),
 		ResetURLBase: envOr("RESET_URL_BASE", "http://localhost:3000/reset-password"),
+		AppEnv:       os.Getenv("APP_ENV"),
+	}
+	if v := os.Getenv("TRUSTED_PROXIES"); v != "" {
+		cfg.TrustedProxies = strings.Split(v, ",")
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
 	}
 	if cfg.AdminAPIKey == "" {
 		return Config{}, errors.New("ADMIN_API_KEY is required")
+	}
+	if len(cfg.AdminAPIKey) < minAdminKeyLen {
+		return Config{}, fmt.Errorf("ADMIN_API_KEY must be at least %d characters", minAdminKeyLen)
 	}
 	if v := os.Getenv("PORT"); v != "" {
 		cfg.Port = v
@@ -66,6 +81,9 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("QUERY_TIMEOUT must be a positive duration, got %q", v)
 		}
 		cfg.QueryTimeout = d
+	}
+	if cfg.AppEnv == "production" && cfg.MailAPIKey == "" {
+		return Config{}, errors.New("MAIL_API_KEY is required when APP_ENV is production")
 	}
 	if cfg.MailAPIKey != "" && cfg.MailFrom == "" {
 		return Config{}, errors.New("MAIL_FROM is required when MAIL_API_KEY is set")
