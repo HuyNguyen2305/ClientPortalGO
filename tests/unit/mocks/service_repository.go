@@ -113,63 +113,6 @@ func (_c *MockServiceRepository_Create_Call) RunAndReturn(run func(ctx context.C
 	return _c
 }
 
-// Delete provides a mock function for the type MockServiceRepository
-func (_mock *MockServiceRepository) Delete(ctx context.Context, id int64) error {
-	ret := _mock.Called(ctx, id)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Delete")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) error); ok {
-		r0 = returnFunc(ctx, id)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockServiceRepository_Delete_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Delete'
-type MockServiceRepository_Delete_Call struct {
-	*mock.Call
-}
-
-// Delete is a helper method to define mock.On call
-//   - ctx context.Context
-//   - id int64
-func (_e *MockServiceRepository_Expecter) Delete(ctx any, id any) *MockServiceRepository_Delete_Call {
-	return &MockServiceRepository_Delete_Call{Call: _e.mock.On("Delete", ctx, id)}
-}
-
-func (_c *MockServiceRepository_Delete_Call) Run(run func(ctx context.Context, id int64)) *MockServiceRepository_Delete_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 int64
-		if args[1] != nil {
-			arg1 = args[1].(int64)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *MockServiceRepository_Delete_Call) Return(err error) *MockServiceRepository_Delete_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockServiceRepository_Delete_Call) RunAndReturn(run func(ctx context.Context, id int64) error) *MockServiceRepository_Delete_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // Get provides a mock function for the type MockServiceRepository
 func (_mock *MockServiceRepository) Get(ctx context.Context, id int64) (model.Service, error) {
 	ret := _mock.Called(ctx, id)
@@ -237,8 +180,8 @@ func (_c *MockServiceRepository_Get_Call) RunAndReturn(run func(ctx context.Cont
 }
 
 // List provides a mock function for the type MockServiceRepository
-func (_mock *MockServiceRepository) List(ctx context.Context) ([]model.Service, error) {
-	ret := _mock.Called(ctx)
+func (_mock *MockServiceRepository) List(ctx context.Context, status string) ([]model.Service, error) {
+	ret := _mock.Called(ctx, status)
 
 	if len(ret) == 0 {
 		panic("no return value specified for List")
@@ -246,18 +189,18 @@ func (_mock *MockServiceRepository) List(ctx context.Context) ([]model.Service, 
 
 	var r0 []model.Service
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]model.Service, error)); ok {
-		return returnFunc(ctx)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]model.Service, error)); ok {
+		return returnFunc(ctx, status)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context) []model.Service); ok {
-		r0 = returnFunc(ctx)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []model.Service); ok {
+		r0 = returnFunc(ctx, status)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]model.Service)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = returnFunc(ctx)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, status)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -271,18 +214,24 @@ type MockServiceRepository_List_Call struct {
 
 // List is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockServiceRepository_Expecter) List(ctx any) *MockServiceRepository_List_Call {
-	return &MockServiceRepository_List_Call{Call: _e.mock.On("List", ctx)}
+//   - status string
+func (_e *MockServiceRepository_Expecter) List(ctx any, status any) *MockServiceRepository_List_Call {
+	return &MockServiceRepository_List_Call{Call: _e.mock.On("List", ctx, status)}
 }
 
-func (_c *MockServiceRepository_List_Call) Run(run func(ctx context.Context)) *MockServiceRepository_List_Call {
+func (_c *MockServiceRepository_List_Call) Run(run func(ctx context.Context, status string)) *MockServiceRepository_List_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
@@ -293,7 +242,70 @@ func (_c *MockServiceRepository_List_Call) Return(services []model.Service, err 
 	return _c
 }
 
-func (_c *MockServiceRepository_List_Call) RunAndReturn(run func(ctx context.Context) ([]model.Service, error)) *MockServiceRepository_List_Call {
+func (_c *MockServiceRepository_List_Call) RunAndReturn(run func(ctx context.Context, status string) ([]model.Service, error)) *MockServiceRepository_List_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetStatus provides a mock function for the type MockServiceRepository
+func (_mock *MockServiceRepository) SetStatus(ctx context.Context, id int64, status string) error {
+	ret := _mock.Called(ctx, id, status)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetStatus")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, string) error); ok {
+		r0 = returnFunc(ctx, id, status)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockServiceRepository_SetStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetStatus'
+type MockServiceRepository_SetStatus_Call struct {
+	*mock.Call
+}
+
+// SetStatus is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+//   - status string
+func (_e *MockServiceRepository_Expecter) SetStatus(ctx any, id any, status any) *MockServiceRepository_SetStatus_Call {
+	return &MockServiceRepository_SetStatus_Call{Call: _e.mock.On("SetStatus", ctx, id, status)}
+}
+
+func (_c *MockServiceRepository_SetStatus_Call) Run(run func(ctx context.Context, id int64, status string)) *MockServiceRepository_SetStatus_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockServiceRepository_SetStatus_Call) Return(err error) *MockServiceRepository_SetStatus_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockServiceRepository_SetStatus_Call) RunAndReturn(run func(ctx context.Context, id int64, status string) error) *MockServiceRepository_SetStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }

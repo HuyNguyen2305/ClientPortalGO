@@ -30,7 +30,7 @@ type BookingEstimate struct {
 // BookingResponse is a booking as returned by the API.
 type BookingResponse struct {
 	ID        int64            `json:"id"`
-	Service   ServiceResponse  `json:"service"`
+	Service   ServiceSummary   `json:"service"`
 	Location  LocationResponse `json:"location"`
 	Date      string           `json:"date"`
 	Time      string           `json:"time"`
@@ -44,8 +44,9 @@ type BookingResponse struct {
 func FromBooking(b model.Booking, loc *time.Location) BookingResponse {
 	start := b.StartsAt.In(loc)
 	return BookingResponse{
-		ID:        b.ID,
-		Service:   FromService(b.Service),
+		ID: b.ID,
+		Service: ServiceSummary{ID: b.Service.ID, Name: b.Service.Name, DurationMinutes: b.Service.DurationMinutes,
+			PriceCents: b.Service.PriceCents},
 		Location:  FromLocation(b.Location),
 		Date:      start.Format(time.DateOnly),
 		Time:      start.Format("15:04"),
@@ -54,6 +55,22 @@ func FromBooking(b model.Booking, loc *time.Location) BookingResponse {
 		Cancelled: b.CancelledAt != nil,
 		Estimate: BookingEstimate{ID: b.Estimate.ID, Number: b.Estimate.Number,
 			Status: string(b.Estimate.Status), TotalCents: b.Estimate.TotalCents},
+	}
+}
+
+// SeriesResponse is a recurring booking: its jobs, and the dates skipped because the slot was taken.
+type SeriesResponse struct {
+	ID      int64             `json:"id"`
+	Jobs    []BookingResponse `json:"jobs"`
+	Skipped []string          `json:"skipped"`
+}
+
+// FromSeries maps a series, showing its times in the business timezone loc.
+func FromSeries(s model.BookingSeries, loc *time.Location) SeriesResponse {
+	return SeriesResponse{
+		ID:      s.ID,
+		Jobs:    MapSlice(s.Jobs, func(b model.Booking) BookingResponse { return FromBooking(b, loc) }),
+		Skipped: MapSlice(s.Skipped, func(d time.Time) string { return d.Format(time.DateOnly) }),
 	}
 }
 

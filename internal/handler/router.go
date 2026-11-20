@@ -55,8 +55,10 @@ func NewRouter(d Deps) *gin.Engine {
 	services := serviceHandler{svc: d.Catalog}
 	api.GET("/services", services.list)
 	api.GET("/services/:id", services.get)
+	admin.GET("/admin/services", services.listAll)
 	admin.POST("/services", services.create)
 	admin.PUT("/services/:id", services.update)
+	admin.POST("/services/:id/archive", services.archive)
 	admin.DELETE("/services/:id", services.delete)
 
 	// Customers register and log in without a token; the limiter slows password guessing.
@@ -115,6 +117,7 @@ func NewRouter(d Deps) *gin.Engine {
 	scoped.GET("/booking/days", bookings.days)
 	scoped.GET("/services/:id/slots", bookings.slots)
 	scoped.POST("/bookings", bookings.create)
+	scoped.POST("/booking-series", bookings.createSeries)
 	scoped.GET("/bookings", bookings.list)
 	scoped.GET("/bookings/:id", bookings.get)
 	scoped.POST("/bookings/:id/cancel", bookings.cancel)
