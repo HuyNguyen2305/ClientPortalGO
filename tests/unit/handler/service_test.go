@@ -18,6 +18,12 @@ func TestServiceHandler_RejectsBadInput(t *testing.T) {
 		{"price missing", http.MethodPost, "/api/v1/services", `{"name":"x","duration_minutes":30}`},
 		{"negative price", http.MethodPost, "/api/v1/services", `{"name":"x","duration_minutes":30,"price_cents":-1}`},
 		{"duration as text", http.MethodPost, "/api/v1/services", `{"name":"x","duration_minutes":"30","price_cents":1}`},
+		{"bad repeat unit", http.MethodPost, "/api/v1/services", `{"name":"x","duration_minutes":30,"price_cents":1,"repeat":{"unit":"hourly"}}`},
+		{"bad ends date", http.MethodPost, "/api/v1/services", `{"name":"x","duration_minutes":30,"price_cents":1,"repeat":{"unit":"daily","ends":"on_date","ends_on":"soon"}}`},
+		{"bad color", http.MethodPost, "/api/v1/services", `{"name":"x","duration_minutes":30,"price_cents":1,"color":"blue"}`},
+		{"item without a name", http.MethodPost, "/api/v1/services", `{"name":"x","duration_minutes":30,"price_cents":1,"items":[{"quantity":1,"unit_price_cents":5}]}`},
+		{"bad archive id", http.MethodPost, "/api/v1/services/abc/archive", ""},
+		{"bad status filter", http.MethodGet, "/api/v1/admin/services?status=gone", ""},
 		{"bad id", http.MethodGet, "/api/v1/services/abc", ""},
 		{"bad id on update", http.MethodPut, "/api/v1/services/0", `{"name":"x","duration_minutes":30,"price_cents":1}`},
 	}

@@ -307,6 +307,119 @@ func TestBookingRejectsBadRequests(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, rec.Code, "a token is required")
 }
 
+func TestBookingSeries(t *testing.T) {
+	w := newWorld(t)
+	rec := w.app.Do(t, http.MethodPost, "/api/v1/services", 0, map[string]any{
+		"name": "Weekly Service", "duration_minutes": 30, "price_cents": 1,
+		"repeat": map[string]any{"unit": "weekly", "every": 1},
+		"items": []map[string]any{
+			{"name": "Visit", "quantity": 1, "unit_price_cents": 3000},
+			{"name": "Supplies", "quantity": 1, "unit_price_cents": 1500},
+		},
+	})
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	weekly := testapp.Decode[dto.ServiceResponse](t, rec)
+
+	first, err := time.Parse(time.DateOnly, w.day)
+	require.NoError(t, err)
+	second := first.AddDate(0, 0, 7).Format(time.DateOnly)
+	_, last := testapp.Hours.BookableRange(time.Now())
+	want := 0
+	for d := first; !d.After(last); d = d.AddDate(0, 0, 7) {
+		want++
+	}
+
+	// Another customer holds 09:00-09:45 a week after the first date.
+	other, otherLoc := newCustomer(t, w.app, "B")
+	rec = w.app.Do(t, http.MethodPost, "/api/v1/bookings", other, map[string]any{
+		"service_id": w.service.ID, "location_id": otherLoc, "date": second, "time": "09:00",
+	})
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+
+	post := func(customer, location int64, service int64, date string) *httptest.ResponseRecorder {
+		return w.app.Do(t, http.MethodPost, "/api/v1/booking-series", customer, map[string]any{
+			"service_id": service, "location_id": location, "date": date, "time": "09:00",
+		})
+	}
+
+	rec = post(w.customer, w.location, weekly.ID, w.day)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	series := testapp.Decode[dto.SeriesResponse](t, rec)
+	assert.Len(t, series.Jobs, want-1, "one job per week, minus the taken date")
+	assert.Equal(t, []string{second}, series.Skipped)
+	for _, j := range series.Jobs {
+		assert.Equal(t, "09:00", j.Time)
+		assert.Equal(t, "open", j.Estimate.Status)
+		assert.Equal(t, int64(4500), j.Estimate.TotalCents)
+		assert.NotEqual(t, second, j.Date)
+	}
+
+	t.Run("every job has its own estimate with the template's items", func(t *testing.T) {
+		var estimates, lines int
+		require.NoError(t, w.app.Pool.QueryRow(t.Context(),
+			`SELECT count(DISTINCT b.estimate_id), count(i.id)
+			 FROM bookings b JOIN billing_document_items i ON i.billing_document_id = b.estimate_id
+			 WHERE b.series_id = $1`, series.ID).Scan(&estimates, &lines))
+		assert.Equal(t, want-1, estimates)
+		assert.Equal(t, 2*(want-1), lines)
+	})
+
+	t.Run("the series is exempt from the per-customer cap", func(t *testing.T) {
+		assert.Greater(t, len(series.Jobs), 3)
+		assert.Equal(t, http.StatusCreated, w.book(t, w.customer, w.location, "13:00").code, "single bookings still work")
+	})
+
+	t.Run("a second series of the same template is refused", func(t *testing.T) {
+		assert.Equal(t, http.StatusConflict, post(w.customer, w.location, weekly.ID, w.day).Code)
+	})
+
+	t.Run("declining one estimate cancels only that job", func(t *testing.T) {
+		j := series.Jobs[0]
+		rec := w.app.Do(t, http.MethodPost, fmt.Sprintf("/api/v1/estimates/%d/decline", j.Estimate.ID), w.customer, nil)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		rec = w.app.Do(t, http.MethodGet, "/api/v1/bookings", w.customer, nil)
+		live := testapp.Decode[dto.Page[dto.BookingResponse]](t, rec).Data
+		assert.Len(t, live, len(series.Jobs)) // one fewer series job, plus the 13:00 single booking
+	})
+
+	t.Run("a series cannot be booked through the single booking endpoint", func(t *testing.T) {
+		rec := w.app.Do(t, http.MethodPost, "/api/v1/bookings", other, map[string]any{
+			"service_id": weekly.ID, "location_id": otherLoc, "date": w.day, "time": "11:00",
+		})
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("a service that does not repeat is refused", func(t *testing.T) {
+		assert.Equal(t, http.StatusBadRequest, post(other, otherLoc, w.service.ID, w.day).Code)
+	})
+
+	t.Run("an archived template cannot be booked", func(t *testing.T) {
+		require.Equal(t, http.StatusNoContent, w.app.Do(t, http.MethodPost, fmt.Sprintf("/api/v1/services/%d/archive", weekly.ID), 0, nil).Code)
+		assert.Equal(t, http.StatusNotFound, post(other, otherLoc, weekly.ID, w.day).Code)
+	})
+}
+
+func TestBookingSeriesEnds(t *testing.T) {
+	w := newWorld(t)
+	rec := w.app.Do(t, http.MethodPost, "/api/v1/services", 0, map[string]any{
+		"name": "Three Visits", "duration_minutes": 30, "price_cents": 2000, "set_confirmed": false,
+		"repeat": map[string]any{"unit": "daily", "every": 2, "ends": "after", "ends_after": 3},
+	})
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	tpl := testapp.Decode[dto.ServiceResponse](t, rec)
+
+	rec = w.app.Do(t, http.MethodPost, "/api/v1/booking-series", w.customer, map[string]any{
+		"service_id": tpl.ID, "location_id": w.location, "date": w.day, "time": "08:00",
+	})
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	series := testapp.Decode[dto.SeriesResponse](t, rec)
+	require.Len(t, series.Jobs, 3)
+	assert.Empty(t, series.Skipped)
+	assert.Equal(t, "draft", series.Jobs[0].Estimate.Status, "set_confirmed=false makes draft estimates")
+	first, _ := time.Parse(time.DateOnly, w.day)
+	assert.Equal(t, first.AddDate(0, 0, 4).Format(time.DateOnly), series.Jobs[2].Date)
+}
+
 func TestBookingDays(t *testing.T) {
 	w := newWorld(t)
 	first, last := testapp.Hours.BookableRange(time.Now())

@@ -15,6 +15,15 @@ type Booking struct {
 	StartsAt    time.Time
 	EndsAt      time.Time
 	CancelledAt *time.Time
+	SeriesID    *int64 // set when the booking is a job of a recurring series
+}
+
+// BookingSeries is a customer's recurring booking: its jobs, and the dates skipped because the
+// slot was taken.
+type BookingSeries struct {
+	ID      int64
+	Jobs    []Booking
+	Skipped []time.Time // calendar dates, midnight UTC
 }
 
 // BookingInput is a customer's booking request; Date and Time are business-local.

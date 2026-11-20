@@ -14,7 +14,7 @@ import (
 // as its estimate (created together, cancelled when the estimate is declined).
 
 const bookingSelect = `
-SELECT b.id, b.customer_id, b.starts_at, b.ends_at, b.cancelled_at,
+SELECT b.id, b.customer_id, b.starts_at, b.ends_at, b.cancelled_at, b.series_id,
        s.id, s.name, s.duration_minutes, s.price_cents, s.created_at, s.updated_at,
        l.id, l.customer_id, l.street, l.city, l.state, l.postal_code, l.created_at, l.updated_at,
        d.id, d.number, d.status, d.total_cents
@@ -27,7 +27,7 @@ func scanBooking(row pgx.Row) (model.Booking, error) {
 	var b model.Booking
 	var status string
 	s, l, d := &b.Service, &b.Location, &b.Estimate
-	err := row.Scan(&b.ID, &b.CustomerID, &b.StartsAt, &b.EndsAt, &b.CancelledAt,
+	err := row.Scan(&b.ID, &b.CustomerID, &b.StartsAt, &b.EndsAt, &b.CancelledAt, &b.SeriesID,
 		&s.ID, &s.Name, &s.DurationMinutes, &s.PriceCents, &s.CreatedAt, &s.UpdatedAt,
 		&l.ID, &l.CustomerID, &l.Street, &l.City, &l.State, &l.PostalCode, &l.CreatedAt, &l.UpdatedAt,
 		&d.ID, &d.Number, &status, &d.TotalCents)
@@ -42,13 +42,43 @@ func (r *BillingDocuments) CreateBooking(ctx context.Context, b model.Booking) (
 	defer cancel()
 	var id int64
 	err := r.db.QueryRow(ctx,
-		`INSERT INTO bookings (customer_id, location_id, service_id, estimate_id, starts_at, ends_at)
-		 VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-		b.CustomerID, b.Location.ID, b.Service.ID, b.Estimate.ID, b.StartsAt, b.EndsAt).Scan(&id)
+		`INSERT INTO bookings (customer_id, location_id, service_id, estimate_id, starts_at, ends_at, series_id)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+		b.CustomerID, b.Location.ID, b.Service.ID, b.Estimate.ID, b.StartsAt, b.EndsAt, b.SeriesID).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("insert booking: %w", mapErr(err))
 	}
 	return id, nil
+}
+
+// CreateSeries inserts the series the jobs of a recurring booking point at.
+func (r *BillingDocuments) CreateSeries(ctx context.Context, customerID, locationID, serviceID int64, firstStart time.Time) (int64, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	var id int64
+	err := r.db.QueryRow(ctx,
+		`INSERT INTO booking_series (customer_id, location_id, service_id, first_starts_at)
+		 VALUES ($1, $2, $3, $4) RETURNING id`, customerID, locationID, serviceID, firstStart).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("insert booking series: %w", mapErr(err))
+	}
+	return id, nil
+}
+
+// ListSeriesBookings returns the jobs of one of the customer's series, soonest first.
+func (r *BillingDocuments) ListSeriesBookings(ctx context.Context, customerID, seriesID int64) ([]model.Booking, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	rows, err := r.db.Query(ctx, bookingSelect+`
+		WHERE b.series_id = $1 AND b.customer_id = $2 ORDER BY b.starts_at`, seriesID, customerID)
+	if err != nil {
+		return nil, fmt.Errorf("list series bookings: %w", err)
+	}
+	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (model.Booking, error) { return scanBooking(row) })
+	if err != nil {
+		return nil, fmt.Errorf("list series bookings: %w", err)
+	}
+	return out, nil
 }
 
 // CancelBookingForEstimate cancels the live booking that created the estimate; no booking is fine.

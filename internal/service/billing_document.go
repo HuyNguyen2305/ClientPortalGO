@@ -41,6 +41,10 @@ type BillingDocumentRepository interface {
 
 	// CreateBooking inserts a booking; an overlap with a live booking is ErrConflict.
 	CreateBooking(ctx context.Context, b model.Booking) (int64, error)
+	// CreateSeries inserts the series that the jobs of a recurring booking point at.
+	CreateSeries(ctx context.Context, customerID, locationID, serviceID int64, firstStart time.Time) (int64, error)
+	// ListSeriesBookings returns the jobs of one of the customer's series, soonest first.
+	ListSeriesBookings(ctx context.Context, customerID, seriesID int64) ([]model.Booking, error)
 	// CancelBookingForEstimate cancels the live booking that created the estimate, if any.
 	CancelBookingForEstimate(ctx context.Context, estimateID int64) error
 	// BusyIntervals returns every live booking overlapping [from, to), for any customer.

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"clientportal/internal/model"
@@ -40,6 +41,18 @@ func (s *BookingService) Days(from string) (days []time.Time, prev, next *time.T
 	return s.hours.Days(now, start)
 }
 
+// bookable returns the service when customers can book it; an archived one is not found.
+func (s *BookingService) bookable(ctx context.Context, id int64) (model.Service, error) {
+	svc, err := s.services.Get(ctx, id)
+	if err != nil {
+		return model.Service{}, err
+	}
+	if svc.Status != model.ServiceActive {
+		return model.Service{}, fmt.Errorf("service %d: %w", id, model.ErrNotFound)
+	}
+	return svc, nil
+}
+
 // Slots returns the free start times for a service on a date.
 func (s *BookingService) Slots(ctx context.Context, serviceID int64, date string) (time.Time, []string, error) {
 	day, err := model.ParseDate(date)
@@ -49,7 +62,7 @@ func (s *BookingService) Slots(ctx context.Context, serviceID int64, date string
 	if err := s.hours.CheckBookable(s.now(), day); err != nil {
 		return time.Time{}, nil, err
 	}
-	svc, err := s.services.Get(ctx, serviceID)
+	svc, err := s.bookable(ctx, serviceID)
 	if err != nil {
 		return time.Time{}, nil, fmt.Errorf("slots: %w", err)
 	}
@@ -64,9 +77,12 @@ func (s *BookingService) Slots(ctx context.Context, serviceID int64, date string
 // Book creates the open estimate and the booking in one transaction. A slot taken meanwhile
 // fails the database's no-overlap constraint and comes back as ErrConflict.
 func (s *BookingService) Book(ctx context.Context, customerID int64, in model.BookingInput) (model.Booking, error) {
-	svc, err := s.services.Get(ctx, in.ServiceID)
+	svc, err := s.bookable(ctx, in.ServiceID)
 	if err != nil {
 		return model.Booking{}, fmt.Errorf("book: %w", err)
+	}
+	if svc.Recurrence.Repeats() {
+		return model.Booking{}, fmt.Errorf("%w: service %d repeats; book it with /booking-series", model.ErrValidation, svc.ID)
 	}
 	start, err := s.hours.ParseSlot(s.now(), in.Date, in.Time, svc.DurationMinutes)
 	if err != nil {
@@ -85,40 +101,148 @@ func (s *BookingService) Book(ctx context.Context, customerID int64, in model.Bo
 	if err != nil {
 		return model.Booking{}, fmt.Errorf("book: %w", err)
 	}
-	if len(live) >= s.maxLive {
-		return model.Booking{}, fmt.Errorf("%w: you already have %d upcoming bookings; cancel one first", model.ErrConflict, len(live))
+	// Series jobs do not count: a series is its own unit, limited by the booking horizon.
+	single := 0
+	for _, b := range live {
+		if b.SeriesID == nil {
+			single++
+		}
+	}
+	if single >= s.maxLive {
+		return model.Booking{}, fmt.Errorf("%w: you already have %d upcoming bookings; cancel one first", model.ErrConflict, single)
 	}
 
 	var id int64
 	err = s.docs.WithTx(ctx, func(tx BillingDocumentRepository) error {
-		estimateID, err := tx.Create(ctx, model.BillingDocument{
-			ParentType: model.ParentEstimate,
-			CustomerID: customerID,
-			Location:   model.Location{ID: in.LocationID},
-			Title:      svc.Name,
-			// The customer's confirmation is the request, so the estimate starts open.
-			Status:       model.StatusOpen,
-			DocumentDate: day,
-			TotalCents:   svc.PriceCents,
-			Items:        []model.Item{{Name: svc.Name, Quantity: 1, UnitPriceCents: svc.PriceCents}},
-		})
-		if err != nil {
-			return err
-		}
-		id, err = tx.CreateBooking(ctx, model.Booking{
-			CustomerID: customerID,
-			Service:    model.Service{ID: svc.ID},
-			Location:   model.Location{ID: in.LocationID},
-			Estimate:   model.BillingDocument{ID: estimateID},
-			StartsAt:   start,
-			EndsAt:     start.Add(time.Duration(svc.DurationMinutes) * time.Minute),
-		})
+		var err error
+		id, err = s.createJob(ctx, tx, svc, customerID, in.LocationID, day, start, nil)
 		return err
 	})
 	if err != nil {
 		return model.Booking{}, fmt.Errorf("book: %w", err)
 	}
 	return s.Get(ctx, customerID, id)
+}
+
+// createJob writes one estimate and the booking that points at it, copying the template's items.
+func (s *BookingService) createJob(ctx context.Context, tx BillingDocumentRepository, svc model.Service,
+	customerID, locationID int64, day, start time.Time, seriesID *int64) (int64, error) {
+	items := svc.EstimateItems()
+	// The customer's confirmation is the request, so the estimate starts open unless the template says draft.
+	status := model.StatusOpen
+	if !svc.SetConfirmed {
+		status = model.StatusDraft
+	}
+	estimateID, err := tx.Create(ctx, model.BillingDocument{
+		ParentType:   model.ParentEstimate,
+		CustomerID:   customerID,
+		Location:     model.Location{ID: locationID},
+		Title:        svc.Name,
+		Status:       status,
+		DocumentDate: day,
+		TotalCents:   model.SumItems(items),
+		Items:        items,
+	})
+	if err != nil {
+		return 0, err
+	}
+	return tx.CreateBooking(ctx, model.Booking{
+		CustomerID: customerID,
+		Service:    model.Service{ID: svc.ID},
+		Location:   model.Location{ID: locationID},
+		Estimate:   model.BillingDocument{ID: estimateID},
+		StartsAt:   start,
+		EndsAt:     start.Add(time.Duration(svc.DurationMinutes) * time.Minute),
+		SeriesID:   seriesID,
+	})
+}
+
+// BookSeries books a recurring template: one job (estimate and booking) per date of its repeat rule,
+// from the customer's first slot to the end of the series or the booking horizon. A date whose slot
+// is taken is skipped and reported; the rest of the series goes ahead.
+func (s *BookingService) BookSeries(ctx context.Context, customerID int64, in model.BookingInput) (model.BookingSeries, error) {
+	svc, err := s.bookable(ctx, in.ServiceID)
+	if err != nil {
+		return model.BookingSeries{}, fmt.Errorf("book series: %w", err)
+	}
+	if !svc.Recurrence.Repeats() {
+		return model.BookingSeries{}, fmt.Errorf("%w: service %d does not repeat; book it with /bookings", model.ErrValidation, svc.ID)
+	}
+	first, err := s.hours.ParseSlot(s.now(), in.Date, in.Time, svc.DurationMinutes)
+	if err != nil {
+		return model.BookingSeries{}, err
+	}
+	if _, err := s.locs.Get(ctx, customerID, in.LocationID); err != nil {
+		return model.BookingSeries{}, fmt.Errorf("book series: location: %w", err)
+	}
+	live, err := s.docs.ListUpcoming(ctx, customerID, s.now())
+	if err != nil {
+		return model.BookingSeries{}, fmt.Errorf("book series: %w", err)
+	}
+	for _, b := range live {
+		if b.SeriesID != nil && b.Service.ID == svc.ID {
+			return model.BookingSeries{}, fmt.Errorf("%w: you already have an upcoming series of service %d", model.ErrConflict, svc.ID)
+		}
+	}
+
+	firstDay, err := model.ParseDate(in.Date)
+	if err != nil {
+		return model.BookingSeries{}, err
+	}
+	_, lastDay := s.hours.BookableRange(s.now())
+	days := svc.Recurrence.Days(firstDay, lastDay)
+	if len(days) == 0 { // the series ended before the chosen first date
+		return model.BookingSeries{}, fmt.Errorf("%w: the series ends before %s", model.ErrValidation, in.Date)
+	}
+	from, _ := s.hours.DayBounds(firstDay)
+	_, to := s.hours.DayBounds(days[len(days)-1])
+	busy, err := s.docs.BusyIntervals(ctx, from, to)
+	if err != nil {
+		return model.BookingSeries{}, fmt.Errorf("book series: %w", err)
+	}
+
+	type job struct{ day, start time.Time }
+	var jobs []job
+	var skipped []time.Time
+	length := time.Duration(svc.DurationMinutes) * time.Minute
+	for _, d := range days {
+		start, err := s.hours.ParseSlot(s.now(), d.Format(time.DateOnly), in.Time, svc.DurationMinutes)
+		if err != nil {
+			return model.BookingSeries{}, err
+		}
+		if slices.ContainsFunc(busy, func(iv model.Interval) bool { return iv.Start.Before(start.Add(length)) && start.Before(iv.End) }) {
+			skipped = append(skipped, d)
+			continue
+		}
+		jobs = append(jobs, job{d, start})
+	}
+	if len(jobs) == 0 {
+		return model.BookingSeries{}, fmt.Errorf("%w: every date of the series is already taken", model.ErrConflict)
+	}
+
+	var seriesID int64
+	// shortcut: a slot taken between the check above and the insert fails the whole series with
+	// ErrConflict (bookings_no_overlap); retry per job with a savepoint if that ever matters.
+	err = s.docs.WithTx(ctx, func(tx BillingDocumentRepository) error {
+		var err error
+		if seriesID, err = tx.CreateSeries(ctx, customerID, in.LocationID, svc.ID, first); err != nil {
+			return err
+		}
+		for _, j := range jobs {
+			if _, err := s.createJob(ctx, tx, svc, customerID, in.LocationID, j.day, j.start, &seriesID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return model.BookingSeries{}, fmt.Errorf("book series: %w", err)
+	}
+	made, err := s.docs.ListSeriesBookings(ctx, customerID, seriesID)
+	if err != nil {
+		return model.BookingSeries{}, fmt.Errorf("book series: %w", err)
+	}
+	return model.BookingSeries{ID: seriesID, Jobs: made, Skipped: skipped}, nil
 }
 
 // Cancel cancels one of the customer's live bookings and declines its estimate, freeing the slot.
