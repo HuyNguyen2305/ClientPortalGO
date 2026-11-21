@@ -50,6 +50,10 @@ type BillingDocumentRepository interface {
 	// BusyIntervals returns every live booking overlapping [from, to), for any customer.
 	BusyIntervals(ctx context.Context, from, to time.Time) ([]model.Interval, error)
 	GetBooking(ctx context.Context, customerID, id int64) (model.Booking, error)
+	// AdvanceWork moves a live booking's work order from one status to the next; notes, if given, replace the old ones.
+	AdvanceWork(ctx context.Context, id int64, from, to model.WorkStatus, notes *string) error
+	// ListWorkOrders returns the customer's work orders, newest first, as bookings carrying them.
+	ListWorkOrders(ctx context.Context, f model.WorkFilter) ([]model.Booking, error)
 	// HasConvertedInvoice reports whether an invoice was created from the estimate.
 	HasConvertedInvoice(ctx context.Context, estimateID int64) (bool, error)
 	// ListUpcoming returns the customer's live bookings that end after now, soonest first.

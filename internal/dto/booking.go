@@ -19,6 +19,20 @@ func (r BookingRequest) ToInput() model.BookingInput {
 	return model.BookingInput{ServiceID: r.ServiceID, LocationID: r.LocationID, Date: r.Date, Time: r.Time}
 }
 
+// CompleteRequest is the body for completing a work order; notes are optional.
+type CompleteRequest struct {
+	Notes *string `json:"notes" binding:"omitempty,max=2000"`
+}
+
+// WorkOrder is a booking's work-order state.
+type WorkOrder struct {
+	ID          int64      `json:"id"`
+	Status      string     `json:"status"`
+	StartedAt   *time.Time `json:"started_at"`
+	CompletedAt *time.Time `json:"completed_at"`
+	Notes       *string    `json:"notes"`
+}
+
 // BookingEstimate is the estimate a booking created.
 type BookingEstimate struct {
 	ID         int64  `json:"id"`
@@ -38,6 +52,7 @@ type BookingResponse struct {
 	EndsAt    time.Time        `json:"ends_at"`
 	Cancelled bool             `json:"cancelled"`
 	Estimate  BookingEstimate  `json:"estimate"`
+	WorkOrder WorkOrder        `json:"work_order"`
 }
 
 // FromBooking maps a booking, showing its times in the business timezone loc.
@@ -55,6 +70,7 @@ func FromBooking(b model.Booking, loc *time.Location) BookingResponse {
 		Cancelled: b.CancelledAt != nil,
 		Estimate: BookingEstimate{ID: b.Estimate.ID, Number: b.Estimate.Number,
 			Status: string(b.Estimate.Status), TotalCents: b.Estimate.TotalCents},
+		WorkOrder: WorkOrder{ID: b.WorkOrderID, Status: string(b.WorkStatus()), StartedAt: b.StartedAt, CompletedAt: b.CompletedAt, Notes: b.Notes},
 	}
 }
 
