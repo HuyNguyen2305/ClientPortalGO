@@ -204,7 +204,27 @@ internal/app/app.go                   app.New(pool, cfg, log)
   - day paging edges.
 - Done means `task test`, `task test:integration` and `task check` pass.
 
+## Work orders
+
+Every booking has one work order, a row in `work_orders` (migration 000015) linked to the booking
+and to the service template, and created in the same statement as the booking. It copies
+`customer_id` and `service_id` from the booking so a customer's list needs no join. The status moves `scheduled` → `in_progress` → `completed`,
+and a cancelled booking reports `cancelled`. Staff move it with the admin key and no customer
+header; customers read it as `work_order` in the booking responses.
+
+| Method and path | Does |
+|---|---|
+| `POST /bookings/:id/start` | admin: scheduled → in progress; 204 |
+| `POST /bookings/:id/complete` | admin: in progress → completed, optional `{"notes": "..."}` (send `{}` for none); 204 |
+
+404 for a missing booking; 409 when the booking is cancelled or not in the status the step needs.
+
+`GET /work-orders?status=&service_id=&limit=&cursor=` (customer) lists the customer's own work
+orders, newest first, past and cancelled ones included. Each item is the booking response with
+its `work_order` (`id`, `status`, times, `notes`). `status` is one of `scheduled`, `in_progress`,
+`completed`, `cancelled`; `next_cursor` continues the list, as in `GET /customers`.
+
 ## Out of scope
 
 Rescheduling; several crews; per-weekday hours and holidays; admin authentication; technicians,
-travel time, reminders; work orders.
+travel time, reminders; work-order assignment, photos and checklists.

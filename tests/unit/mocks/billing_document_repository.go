@@ -124,6 +124,81 @@ func (_c *MockBillingDocumentRepository_AddPayment_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// AdvanceWork provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) AdvanceWork(ctx context.Context, id int64, from model.WorkStatus, to model.WorkStatus, notes *string) error {
+	ret := _mock.Called(ctx, id, from, to, notes)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AdvanceWork")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, model.WorkStatus, model.WorkStatus, *string) error); ok {
+		r0 = returnFunc(ctx, id, from, to, notes)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockBillingDocumentRepository_AdvanceWork_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AdvanceWork'
+type MockBillingDocumentRepository_AdvanceWork_Call struct {
+	*mock.Call
+}
+
+// AdvanceWork is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+//   - from model.WorkStatus
+//   - to model.WorkStatus
+//   - notes *string
+func (_e *MockBillingDocumentRepository_Expecter) AdvanceWork(ctx any, id any, from any, to any, notes any) *MockBillingDocumentRepository_AdvanceWork_Call {
+	return &MockBillingDocumentRepository_AdvanceWork_Call{Call: _e.mock.On("AdvanceWork", ctx, id, from, to, notes)}
+}
+
+func (_c *MockBillingDocumentRepository_AdvanceWork_Call) Run(run func(ctx context.Context, id int64, from model.WorkStatus, to model.WorkStatus, notes *string)) *MockBillingDocumentRepository_AdvanceWork_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 model.WorkStatus
+		if args[2] != nil {
+			arg2 = args[2].(model.WorkStatus)
+		}
+		var arg3 model.WorkStatus
+		if args[3] != nil {
+			arg3 = args[3].(model.WorkStatus)
+		}
+		var arg4 *string
+		if args[4] != nil {
+			arg4 = args[4].(*string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_AdvanceWork_Call) Return(err error) *MockBillingDocumentRepository_AdvanceWork_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_AdvanceWork_Call) RunAndReturn(run func(ctx context.Context, id int64, from model.WorkStatus, to model.WorkStatus, notes *string) error) *MockBillingDocumentRepository_AdvanceWork_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Balance provides a mock function for the type MockBillingDocumentRepository
 func (_mock *MockBillingDocumentRepository) Balance(ctx context.Context, customerID int64, locationID *int64) (int64, error) {
 	ret := _mock.Called(ctx, customerID, locationID)
@@ -1314,6 +1389,74 @@ func (_c *MockBillingDocumentRepository_ListUpcoming_Call) Return(bookings []mod
 }
 
 func (_c *MockBillingDocumentRepository_ListUpcoming_Call) RunAndReturn(run func(ctx context.Context, customerID int64, now time.Time) ([]model.Booking, error)) *MockBillingDocumentRepository_ListUpcoming_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListWorkOrders provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) ListWorkOrders(ctx context.Context, f model.WorkFilter) ([]model.Booking, error) {
+	ret := _mock.Called(ctx, f)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListWorkOrders")
+	}
+
+	var r0 []model.Booking
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, model.WorkFilter) ([]model.Booking, error)); ok {
+		return returnFunc(ctx, f)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, model.WorkFilter) []model.Booking); ok {
+		r0 = returnFunc(ctx, f)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]model.Booking)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, model.WorkFilter) error); ok {
+		r1 = returnFunc(ctx, f)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBillingDocumentRepository_ListWorkOrders_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListWorkOrders'
+type MockBillingDocumentRepository_ListWorkOrders_Call struct {
+	*mock.Call
+}
+
+// ListWorkOrders is a helper method to define mock.On call
+//   - ctx context.Context
+//   - f model.WorkFilter
+func (_e *MockBillingDocumentRepository_Expecter) ListWorkOrders(ctx any, f any) *MockBillingDocumentRepository_ListWorkOrders_Call {
+	return &MockBillingDocumentRepository_ListWorkOrders_Call{Call: _e.mock.On("ListWorkOrders", ctx, f)}
+}
+
+func (_c *MockBillingDocumentRepository_ListWorkOrders_Call) Run(run func(ctx context.Context, f model.WorkFilter)) *MockBillingDocumentRepository_ListWorkOrders_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 model.WorkFilter
+		if args[1] != nil {
+			arg1 = args[1].(model.WorkFilter)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_ListWorkOrders_Call) Return(bookings []model.Booking, err error) *MockBillingDocumentRepository_ListWorkOrders_Call {
+	_c.Call.Return(bookings, err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_ListWorkOrders_Call) RunAndReturn(run func(ctx context.Context, f model.WorkFilter) ([]model.Booking, error)) *MockBillingDocumentRepository_ListWorkOrders_Call {
 	_c.Call.Return(run)
 	return _c
 }

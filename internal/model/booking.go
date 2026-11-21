@@ -16,6 +16,51 @@ type Booking struct {
 	EndsAt      time.Time
 	CancelledAt *time.Time
 	SeriesID    *int64 // set when the booking is a job of a recurring series
+
+	// The visit's work order, moved by staff.
+	WorkOrderID int64
+	Work        WorkStatus
+	StartedAt   *time.Time
+	CompletedAt *time.Time
+	Notes       *string
+}
+
+// WorkFilter selects one customer's work orders, newest first. Zero ServiceID, AfterID and an
+// empty Status mean no filter; AfterID is the last work order of the previous page.
+type WorkFilter struct {
+	CustomerID int64
+	Status     WorkStatus
+	ServiceID  int64
+	AfterID    int64
+	Limit      int
+}
+
+// ValidWorkStatus reports whether s is a status a work order can report, "cancelled" included.
+func ValidWorkStatus(s WorkStatus) bool {
+	switch s {
+	case WorkScheduled, WorkInProgress, WorkCompleted, WorkCancelled:
+		return true
+	}
+	return false
+}
+
+// WorkStatus is where a booked visit stands. A cancelled booking reports WorkCancelled.
+type WorkStatus string
+
+// Work statuses.
+const (
+	WorkScheduled  WorkStatus = "scheduled"
+	WorkInProgress WorkStatus = "in_progress"
+	WorkCompleted  WorkStatus = "completed"
+	WorkCancelled  WorkStatus = "cancelled"
+)
+
+// WorkStatus is the booking's work-order status, "cancelled" once the booking is.
+func (b Booking) WorkStatus() WorkStatus {
+	if b.CancelledAt != nil {
+		return WorkCancelled
+	}
+	return b.Work
 }
 
 // BookingSeries is a customer's recurring booking: its jobs, and the dates skipped because the

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -79,6 +80,72 @@ func (h bookingHandler) cancel(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, dto.FromBooking(b, h.svc.Location()))
+}
+
+func (h bookingHandler) start(c *gin.Context) {
+	id, err := PathID(c)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	if err := h.svc.Start(c.Request.Context(), id); err != nil {
+		RespondError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (h bookingHandler) complete(c *gin.Context) {
+	id, err := PathID(c)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	var req dto.CompleteRequest
+	if err := bindJSON(c, &req); err != nil {
+		RespondError(c, err)
+		return
+	}
+	if err := h.svc.Complete(c.Request.Context(), id, req.Notes); err != nil {
+		RespondError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+// listWork pages through the customer's work orders; each item is its booking with the work order inside.
+func (h bookingHandler) listWork(c *gin.Context) {
+	limit, err := dto.ParseLimit(c.Query("limit"))
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	f := model.WorkFilter{CustomerID: middleware.CustomerID(c), Status: model.WorkStatus(c.Query("status")), Limit: limit}
+	if raw := c.Query("cursor"); raw != "" {
+		if f.AfterID, err = positiveInt64("cursor", raw); err != nil {
+			RespondError(c, err)
+			return
+		}
+	}
+	if raw := c.Query("service_id"); raw != "" {
+		if f.ServiceID, err = positiveInt64("service_id", raw); err != nil {
+			RespondError(c, err)
+			return
+		}
+	}
+	items, next, err := h.svc.ListWork(c.Request.Context(), f)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	loc := h.svc.Location()
+	page := dto.Page[dto.BookingResponse]{
+		Data: dto.MapSlice(items, func(b model.Booking) dto.BookingResponse { return dto.FromBooking(b, loc) }),
+	}
+	if next != 0 {
+		page.NextCursor = strconv.FormatInt(next, 10)
+	}
+	c.JSON(http.StatusOK, page)
 }
 
 func (h bookingHandler) list(c *gin.Context) {

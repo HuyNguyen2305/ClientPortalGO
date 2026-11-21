@@ -121,6 +121,10 @@ func NewRouter(d Deps) *gin.Engine {
 	scoped.GET("/bookings", bookings.list)
 	scoped.GET("/bookings/:id", bookings.get)
 	scoped.POST("/bookings/:id/cancel", bookings.cancel)
+	scoped.GET("/work-orders", bookings.listWork)
+	// Work orders are moved by staff, who name no customer.
+	admin.POST("/bookings/:id/start", bookings.start)
+	admin.POST("/bookings/:id/complete", bookings.complete)
 
 	// Off until a Stripe key is configured.
 	if d.PaymentMethods != nil {

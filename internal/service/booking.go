@@ -287,6 +287,44 @@ func (s *BookingService) Cancel(ctx context.Context, customerID, id int64) (mode
 	return s.Get(ctx, customerID, id)
 }
 
+// ListWork returns one page of the customer's work orders and the id to continue after, 0 on the
+// last page.
+func (s *BookingService) ListWork(ctx context.Context, f model.WorkFilter) (items []model.Booking, nextAfterID int64, err error) {
+	if f.Limit < 1 {
+		return nil, 0, fmt.Errorf("%w: limit must be at least 1", model.ErrValidation)
+	}
+	if f.Status != "" && !model.ValidWorkStatus(f.Status) {
+		return nil, 0, fmt.Errorf("%w: unknown work order status %q", model.ErrValidation, f.Status)
+	}
+	limit := f.Limit
+	f.Limit++
+	items, err = s.docs.ListWorkOrders(ctx, f)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list work orders: %w", err)
+	}
+	if len(items) > limit {
+		items = items[:limit]
+		nextAfterID = items[limit-1].WorkOrderID
+	}
+	return items, nextAfterID, nil
+}
+
+// Start marks a scheduled booking's work order in progress.
+func (s *BookingService) Start(ctx context.Context, id int64) error {
+	if err := s.docs.AdvanceWork(ctx, id, model.WorkScheduled, model.WorkInProgress, nil); err != nil {
+		return fmt.Errorf("start work: %w", err)
+	}
+	return nil
+}
+
+// Complete marks an in-progress work order completed, saving the notes when given.
+func (s *BookingService) Complete(ctx context.Context, id int64, notes *string) error {
+	if err := s.docs.AdvanceWork(ctx, id, model.WorkInProgress, model.WorkCompleted, notes); err != nil {
+		return fmt.Errorf("complete work: %w", err)
+	}
+	return nil
+}
+
 // Get returns one of the customer's bookings.
 func (s *BookingService) Get(ctx context.Context, customerID, id int64) (model.Booking, error) {
 	b, err := s.docs.GetBooking(ctx, customerID, id)

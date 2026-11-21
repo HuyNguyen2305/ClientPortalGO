@@ -15,35 +15,68 @@ import (
 
 const bookingSelect = `
 SELECT b.id, b.customer_id, b.starts_at, b.ends_at, b.cancelled_at, b.series_id,
+       w.id, w.status, w.started_at, w.completed_at, w.notes,
        s.id, s.name, s.duration_minutes, s.price_cents, s.created_at, s.updated_at,
        l.id, l.customer_id, l.street, l.city, l.state, l.postal_code, l.created_at, l.updated_at,
        d.id, d.number, d.status, d.total_cents
 FROM bookings b
+JOIN work_orders w ON w.booking_id = b.id
 JOIN services s ON s.id = b.service_id
 JOIN locations l ON l.id = b.location_id
 JOIN billing_documents d ON d.id = b.estimate_id`
 
 func scanBooking(row pgx.Row) (model.Booking, error) {
 	var b model.Booking
-	var status string
+	var status, work string
 	s, l, d := &b.Service, &b.Location, &b.Estimate
 	err := row.Scan(&b.ID, &b.CustomerID, &b.StartsAt, &b.EndsAt, &b.CancelledAt, &b.SeriesID,
+		&b.WorkOrderID, &work, &b.StartedAt, &b.CompletedAt, &b.Notes,
 		&s.ID, &s.Name, &s.DurationMinutes, &s.PriceCents, &s.CreatedAt, &s.UpdatedAt,
 		&l.ID, &l.CustomerID, &l.Street, &l.City, &l.State, &l.PostalCode, &l.CreatedAt, &l.UpdatedAt,
 		&d.ID, &d.Number, &status, &d.TotalCents)
 	d.ParentType, d.Status = model.ParentEstimate, model.Status(status)
+	b.Work = model.WorkStatus(work)
 	return b, err
 }
 
-// CreateBooking inserts a booking. Overlapping a live booking violates bookings_no_overlap,
-// which mapErr turns into ErrConflict.
+// AdvanceWork moves a live booking's work order from one status to the next, stamping started_at
+// or completed_at. A missing booking is ErrNotFound; one that is cancelled or not in status from
+// is ErrConflict.
+func (r *BillingDocuments) AdvanceWork(ctx context.Context, id int64, from, to model.WorkStatus, notes *string) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	tag, err := r.db.Exec(ctx,
+		`UPDATE work_orders SET status = $3, updated_at = now(),
+		        started_at = CASE WHEN $3 = 'in_progress' THEN now() ELSE started_at END,
+		        completed_at = CASE WHEN $3 = 'completed' THEN now() ELSE completed_at END,
+		        notes = COALESCE($4, notes)
+		 WHERE booking_id = $1 AND status = $2
+		   AND EXISTS (SELECT 1 FROM bookings WHERE id = $1 AND cancelled_at IS NULL)`, id, from, to, notes)
+	if err != nil {
+		return fmt.Errorf("advance work on booking %d: %w", id, mapErr(err))
+	}
+	if tag.RowsAffected() == 0 {
+		var one int
+		if err := r.db.QueryRow(ctx, `SELECT 1 FROM bookings WHERE id = $1`, id).Scan(&one); err != nil {
+			return fmt.Errorf("advance work on booking %d: %w", id, mapErr(err))
+		}
+		return fmt.Errorf("%w: booking %d is not %s or is cancelled", model.ErrConflict, id, from)
+	}
+	return nil
+}
+
+// CreateBooking inserts a booking and its work order in one statement. Overlapping a live
+// booking violates bookings_no_overlap, which mapErr turns into ErrConflict.
 func (r *BillingDocuments) CreateBooking(ctx context.Context, b model.Booking) (int64, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 	var id int64
 	err := r.db.QueryRow(ctx,
-		`INSERT INTO bookings (customer_id, location_id, service_id, estimate_id, starts_at, ends_at, series_id)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+		`WITH bk AS (
+		     INSERT INTO bookings (customer_id, location_id, service_id, estimate_id, starts_at, ends_at, series_id)
+		     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, customer_id, service_id)
+		 INSERT INTO work_orders (booking_id, customer_id, service_id)
+		 SELECT id, customer_id, service_id FROM bk RETURNING booking_id`,
 		b.CustomerID, b.Location.ID, b.Service.ID, b.Estimate.ID, b.StartsAt, b.EndsAt, b.SeriesID).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("insert booking: %w", mapErr(err))
@@ -137,6 +170,29 @@ func (r *BillingDocuments) GetBooking(ctx context.Context, customerID, id int64)
 		return model.Booking{}, fmt.Errorf("get booking %d: %w", id, mapErr(err))
 	}
 	return b, nil
+}
+
+// ListWorkOrders returns the customer's work orders newest first, cancelled bookings included, as
+// bookings carrying their work order. A "cancelled" status means the booking is cancelled; the
+// others exclude cancelled bookings.
+func (r *BillingDocuments) ListWorkOrders(ctx context.Context, f model.WorkFilter) ([]model.Booking, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	rows, err := r.db.Query(ctx, bookingSelect+`
+		WHERE w.customer_id = $1
+		  AND ($2::bigint = 0 OR w.id < $2)
+		  AND ($3::bigint = 0 OR w.service_id = $3)
+		  AND ($4 = '' OR ($4 = 'cancelled' AND b.cancelled_at IS NOT NULL)
+		       OR ($4 <> 'cancelled' AND b.cancelled_at IS NULL AND w.status = $4))
+		ORDER BY w.id DESC LIMIT $5`, f.CustomerID, f.AfterID, f.ServiceID, string(f.Status), f.Limit)
+	if err != nil {
+		return nil, fmt.Errorf("list work orders: %w", err)
+	}
+	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (model.Booking, error) { return scanBooking(row) })
+	if err != nil {
+		return nil, fmt.Errorf("list work orders: %w", err)
+	}
+	return out, nil
 }
 
 // ListUpcoming returns the customer's live bookings that end after now, soonest first.
