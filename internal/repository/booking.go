@@ -115,12 +115,15 @@ func (r *BillingDocuments) ListSeriesBookings(ctx context.Context, customerID, s
 }
 
 // CancelBookingForEstimate cancels the live booking that created the estimate; no booking is fine.
+// A booking whose work has started or finished is left alone, so history is never rewritten as cancelled.
 func (r *BillingDocuments) CancelBookingForEstimate(ctx context.Context, estimateID int64) error {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 	if _, err := r.db.Exec(ctx,
 		`UPDATE bookings SET cancelled_at = now(), updated_at = now()
-		 WHERE estimate_id = $1 AND cancelled_at IS NULL`, estimateID); err != nil {
+		 WHERE estimate_id = $1 AND cancelled_at IS NULL
+		   AND NOT EXISTS (SELECT 1 FROM work_orders w WHERE w.booking_id = bookings.id AND w.status <> 'scheduled')`,
+		estimateID); err != nil {
 		return fmt.Errorf("cancel booking for estimate %d: %w", estimateID, err)
 	}
 	return nil

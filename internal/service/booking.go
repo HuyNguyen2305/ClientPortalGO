@@ -246,8 +246,8 @@ func (s *BookingService) BookSeries(ctx context.Context, customerID int64, in mo
 }
 
 // Cancel cancels one of the customer's live bookings and declines its estimate, freeing the slot.
-// It works while the estimate is open or accepted, but not once it became an invoice. The status
-// is set directly: the public /decline transition keeps `accepted` terminal.
+// It works while the estimate is draft, open or accepted, but not once it became an invoice or staff
+// started the work. The status is set directly: the public /decline transition keeps `accepted` terminal.
 func (s *BookingService) Cancel(ctx context.Context, customerID, id int64) (model.Booking, error) {
 	err := s.docs.WithTx(ctx, func(tx BillingDocumentRepository) error {
 		b, err := tx.GetBooking(ctx, customerID, id)
@@ -256,6 +256,9 @@ func (s *BookingService) Cancel(ctx context.Context, customerID, id int64) (mode
 		}
 		if b.CancelledAt != nil {
 			return fmt.Errorf("%w: booking %d is already cancelled", model.ErrConflict, id)
+		}
+		if b.Work != model.WorkScheduled {
+			return fmt.Errorf("%w: work on booking %d has already started", model.ErrConflict, id)
 		}
 		// A visit that took place must stay billable: cancelling would decline its estimate for good.
 		if !b.StartsAt.After(s.now()) {
@@ -266,7 +269,7 @@ func (s *BookingService) Cancel(ctx context.Context, customerID, id int64) (mode
 		if err != nil {
 			return err
 		}
-		if est.Status != model.StatusOpen && est.Status != model.StatusAccepted {
+		if est.Status != model.StatusDraft && est.Status != model.StatusOpen && est.Status != model.StatusAccepted {
 			return fmt.Errorf("%w: estimate %d is %s and cannot be cancelled", model.ErrConflict, est.Number, est.Status)
 		}
 		converted, err := tx.HasConvertedInvoice(ctx, est.ID)

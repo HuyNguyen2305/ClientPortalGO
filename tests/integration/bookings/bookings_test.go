@@ -238,6 +238,51 @@ func TestCancelBooking(t *testing.T) {
 		assert.True(t, testapp.Decode[dto.BookingResponse](t, rec).Cancelled)
 		assert.Contains(t, w.slots(t), "13:00")
 	})
+
+	// A fresh customer keeps the subtests below clear of the per-customer cap.
+	cust, loc := newCustomer(t, w.app, "C")
+
+	t.Run("a booking with a draft estimate can be cancelled", func(t *testing.T) {
+		rec := w.app.Do(t, http.MethodPost, "/api/v1/services", 0, map[string]any{
+			"name": "Needs Confirming", "duration_minutes": 30, "price_cents": 5000, "set_confirmed": false})
+		require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+		tpl := testapp.Decode[dto.ServiceResponse](t, rec)
+		rec = w.app.Do(t, http.MethodPost, "/api/v1/bookings", cust, map[string]any{
+			"service_id": tpl.ID, "location_id": loc, "date": w.day, "time": "14:00"})
+		require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+		b := testapp.Decode[dto.BookingResponse](t, rec)
+		require.Equal(t, "draft", b.Estimate.Status)
+		rec = w.cancel(t, cust, b.ID)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		assert.True(t, testapp.Decode[dto.BookingResponse](t, rec).Cancelled)
+	})
+
+	t.Run("a booking whose work has started cannot be cancelled", func(t *testing.T) {
+		r := w.book(t, cust, loc, "15:00")
+		require.Equal(t, http.StatusCreated, r.code, r.body)
+		require.Equal(t, http.StatusNoContent, w.app.Do(t, http.MethodPost, fmt.Sprintf("/api/v1/bookings/%d/start", r.booking.ID), 0, nil).Code)
+		assert.Equal(t, http.StatusConflict, w.cancel(t, cust, r.booking.ID).Code)
+	})
+
+	t.Run("voiding the invoice of a finished visit keeps the visit", func(t *testing.T) {
+		r := w.book(t, cust, loc, "16:00")
+		require.Equal(t, http.StatusCreated, r.code, r.body)
+		est := fmt.Sprintf("/api/v1/estimates/%d", r.booking.Estimate.ID)
+		require.Equal(t, http.StatusOK, w.app.Do(t, http.MethodPost, est+"/accept", cust, nil).Code)
+		rec := w.app.Do(t, http.MethodPost, est+"/convert", cust, nil)
+		require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+		inv := testapp.Decode[dto.DocumentResponse](t, rec)
+		work := fmt.Sprintf("/api/v1/bookings/%d", r.booking.ID)
+		require.Equal(t, http.StatusNoContent, w.app.Do(t, http.MethodPost, work+"/start", 0, nil).Code)
+		require.Equal(t, http.StatusNoContent, w.app.Do(t, http.MethodPost, work+"/complete", 0, map[string]any{}).Code)
+		rec = w.app.Do(t, http.MethodPost, fmt.Sprintf("/api/v1/invoices/%d/void", inv.ID), cust, nil)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		rec = w.app.Do(t, http.MethodGet, work, cust, nil)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		got := testapp.Decode[dto.BookingResponse](t, rec)
+		assert.False(t, got.Cancelled)
+		assert.Equal(t, "completed", got.WorkOrder.Status)
+	})
 }
 
 func TestBookingCapPerCustomer(t *testing.T) {

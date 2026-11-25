@@ -93,20 +93,11 @@ func (c *Catalog) Create(ctx context.Context, s model.Service) (model.Service, e
 	return out, nil
 }
 
-// Get returns one service that is not deleted.
-func (c *Catalog) Get(ctx context.Context, id int64) (model.Service, error) {
+// GetActive returns a service for customers: an archived or deleted one is not found.
+func (c *Catalog) GetActive(ctx context.Context, id int64) (model.Service, error) {
 	s, err := c.repo.Get(ctx, id)
 	if err != nil {
 		return model.Service{}, fmt.Errorf("get service: %w", err)
-	}
-	return s, nil
-}
-
-// GetActive is Get for customers: an archived service is not found.
-func (c *Catalog) GetActive(ctx context.Context, id int64) (model.Service, error) {
-	s, err := c.Get(ctx, id)
-	if err != nil {
-		return model.Service{}, err
 	}
 	if s.Status != model.ServiceActive {
 		return model.Service{}, fmt.Errorf("get service %d: %w", id, model.ErrNotFound)
@@ -148,6 +139,14 @@ func (c *Catalog) Update(ctx context.Context, id int64, s model.Service) (model.
 func (c *Catalog) Archive(ctx context.Context, id int64) error {
 	if err := c.repo.SetStatus(ctx, id, model.ServiceArchived); err != nil {
 		return fmt.Errorf("archive service: %w", err)
+	}
+	return nil
+}
+
+// Restore makes an archived service bookable again; a deleted service stays not found.
+func (c *Catalog) Restore(ctx context.Context, id int64) error {
+	if err := c.repo.SetStatus(ctx, id, model.ServiceActive); err != nil {
+		return fmt.Errorf("restore service: %w", err)
 	}
 	return nil
 }

@@ -2,8 +2,8 @@ package model
 
 import "time"
 
-// Service statuses. Archived templates are hidden from customers; deleted ones are gone for good
-// from the API but kept in the database because bookings reference them.
+// Service statuses. Archived templates are hidden from customers and can be restored; deleted ones
+// are gone for good, customers never see them and admins only list them, because bookings reference them.
 const (
 	ServiceActive   = "active"
 	ServiceArchived = "archived"
