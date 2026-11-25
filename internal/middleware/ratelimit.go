@@ -20,16 +20,20 @@ func RateLimit(limit int, window time.Duration, fail func(*gin.Context, error)) 
 	}
 	var mu sync.Mutex
 	buckets := map[string]*bucket{}
+	var nextSweep time.Time
 	return func(c *gin.Context) {
 		now := time.Now()
 		mu.Lock()
-		for ip, b := range buckets { // drop spent windows so the map cannot grow without bound
-			if now.Sub(b.start) >= window {
-				delete(buckets, ip)
+		if !now.Before(nextSweep) { // drop spent windows, at most once per window, so the map cannot grow without bound
+			for ip, b := range buckets {
+				if now.Sub(b.start) >= window {
+					delete(buckets, ip)
+				}
 			}
+			nextSweep = now.Add(window)
 		}
 		b := buckets[c.ClientIP()]
-		if b == nil {
+		if b == nil || now.Sub(b.start) >= window {
 			b = &bucket{start: now}
 			buckets[c.ClientIP()] = b
 		}

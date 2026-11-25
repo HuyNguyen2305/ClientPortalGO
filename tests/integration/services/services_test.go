@@ -162,8 +162,13 @@ func TestServiceTemplates(t *testing.T) {
 		assert.Equal(t, []string{"Call Back Service"}, names("/api/v1/admin/services"))
 		assert.Equal(t, http.StatusBadRequest, app.Do(t, http.MethodGet, "/api/v1/admin/services?status=gone", 0, nil).Code)
 
+		require.Equal(t, http.StatusNoContent, app.Do(t, http.MethodPost, path+"/restore", 0, nil).Code)
+		assert.Equal(t, http.StatusOK, app.Do(t, http.MethodGet, path, 0, nil).Code, "a restored service is visible to customers again")
+		require.Equal(t, http.StatusNoContent, app.Do(t, http.MethodPost, path+"/archive", 0, nil).Code)
+
 		require.Equal(t, http.StatusNoContent, app.Do(t, http.MethodDelete, path, 0, nil).Code)
 		assert.Equal(t, []string{"Bi-Monthly Service"}, names("/api/v1/admin/services?status=deleted"))
 		assert.Equal(t, http.StatusNotFound, app.Do(t, http.MethodPost, path+"/archive", 0, nil).Code, "a deleted service cannot be archived")
+		assert.Equal(t, http.StatusNotFound, app.Do(t, http.MethodPost, path+"/restore", 0, nil).Code, "a deleted service cannot be restored")
 	})
 }

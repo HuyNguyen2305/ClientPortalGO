@@ -59,6 +59,7 @@ func NewRouter(d Deps) *gin.Engine {
 	admin.POST("/services", services.create)
 	admin.PUT("/services/:id", services.update)
 	admin.POST("/services/:id/archive", services.archive)
+	admin.POST("/services/:id/restore", services.restore)
 	admin.DELETE("/services/:id", services.delete)
 
 	// Customers register and log in without a token; the limiter slows password guessing.

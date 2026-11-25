@@ -65,6 +65,22 @@ func TestRequireSession(t *testing.T) {
 	}
 }
 
+func TestRateLimitWindowExpires(t *testing.T) {
+	r := gin.New()
+	r.GET("/", middleware.RateLimit(1, 30*time.Millisecond, handler.RespondError), func(c *gin.Context) { c.Status(http.StatusOK) })
+	send := func() int {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.RemoteAddr = "1.2.3.4:1000"
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	assert.Equal(t, http.StatusOK, send())
+	assert.Equal(t, http.StatusTooManyRequests, send())
+	time.Sleep(60 * time.Millisecond)
+	assert.Equal(t, http.StatusOK, send(), "a spent window starts a fresh allowance")
+}
+
 func TestRateLimit(t *testing.T) {
 	r := gin.New()
 	r.GET("/", middleware.RateLimit(2, time.Hour, handler.RespondError), func(c *gin.Context) { c.Status(http.StatusOK) })

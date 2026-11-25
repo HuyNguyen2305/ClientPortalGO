@@ -122,6 +122,15 @@ func TestCatalog_GetActiveHidesArchived(t *testing.T) {
 	assert.ErrorIs(t, err, model.ErrNotFound)
 }
 
+func TestCatalog_RestoreSetsActive(t *testing.T) {
+	repo := mocks.NewMockServiceRepository(t)
+	repo.EXPECT().SetStatus(mock.Anything, int64(4), model.ServiceActive).Return(nil).Once()
+	repo.EXPECT().SetStatus(mock.Anything, int64(5), model.ServiceActive).Return(model.ErrNotFound).Once()
+	c := service.NewCatalog(repo)
+	require.NoError(t, c.Restore(context.Background(), 4))
+	assert.ErrorIs(t, c.Restore(context.Background(), 5), model.ErrNotFound, "a deleted service stays deleted")
+}
+
 func TestCatalog_ArchiveAndDeleteSetStatus(t *testing.T) {
 	repo := mocks.NewMockServiceRepository(t)
 	repo.EXPECT().SetStatus(mock.Anything, int64(4), model.ServiceArchived).Return(nil)

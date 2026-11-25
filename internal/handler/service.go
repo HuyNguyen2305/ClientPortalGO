@@ -86,6 +86,19 @@ func (h serviceHandler) update(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.FromService(s))
 }
 
+func (h serviceHandler) restore(c *gin.Context) {
+	id, err := PathID(c)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	if err := h.svc.Restore(c.Request.Context(), id); err != nil {
+		RespondError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 func (h serviceHandler) archive(c *gin.Context) {
 	id, err := PathID(c)
 	if err != nil {

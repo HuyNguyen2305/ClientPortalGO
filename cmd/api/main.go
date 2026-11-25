@@ -34,6 +34,9 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	if cfg.AppEnv == "production" && len(cfg.TrustedProxies) == 0 {
+		log.Warn("TRUSTED_PROXIES is empty: behind a reverse proxy every client shares one rate-limit bucket")
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
