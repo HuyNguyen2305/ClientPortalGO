@@ -22,7 +22,7 @@ type PaymentGateway interface {
 // InvoiceBooker is the invoice side of paying: *BillingDocumentService satisfies it.
 type InvoiceBooker interface {
 	Get(ctx context.Context, customerID int64, pt model.ParentType, id int64) (model.BillingDocument, error)
-	RecordPayment(ctx context.Context, customerID, invoiceID, amountCents int64, idempotencyKey string) (model.BillingDocument, error)
+	RecordPayment(ctx context.Context, customerID, invoiceID, amountCents int64, idempotencyKey string, src model.PaymentSource) (model.BillingDocument, error)
 	PaymentRecorded(ctx context.Context, customerID, invoiceID int64, key string) (bool, error)
 }
 
@@ -81,29 +81,29 @@ func (s *PaymentMethodService) List(ctx context.Context, customerID int64) ([]mo
 	return cards, nil
 }
 
-// ownCard returns the gateway customer id when cardID is one of the customer's cards, else ErrNotFound.
-func (s *PaymentMethodService) ownCard(ctx context.Context, customerID int64, cardID string) (string, error) {
+// ownCard returns the gateway customer id and the card when cardID is one of the customer's cards, else ErrNotFound.
+func (s *PaymentMethodService) ownCard(ctx context.Context, customerID int64, cardID string) (string, model.Card, error) {
 	gid, err := s.links.StripeID(ctx, customerID)
 	if err != nil {
-		return "", fmt.Errorf("find card: %w", err)
+		return "", model.Card{}, fmt.Errorf("find card: %w", err)
 	}
 	if gid != "" {
 		cards, err := s.gw.ListCards(ctx, gid)
 		if err != nil {
-			return "", fmt.Errorf("find card: %w", err)
+			return "", model.Card{}, fmt.Errorf("find card: %w", err)
 		}
 		for _, c := range cards {
 			if c.ID == cardID {
-				return gid, nil
+				return gid, c, nil
 			}
 		}
 	}
-	return "", fmt.Errorf("find card: %w", model.ErrNotFound)
+	return "", model.Card{}, fmt.Errorf("find card: %w", model.ErrNotFound)
 }
 
 // Delete removes one of the customer's own cards; any other card id is not found.
 func (s *PaymentMethodService) Delete(ctx context.Context, customerID int64, cardID string) error {
-	if _, err := s.ownCard(ctx, customerID, cardID); err != nil {
+	if _, _, err := s.ownCard(ctx, customerID, cardID); err != nil {
 		return fmt.Errorf("delete card: %w", err)
 	}
 	if err := s.gw.DetachCard(ctx, cardID); err != nil {
@@ -132,7 +132,7 @@ func (s *PaymentMethodService) PayInvoice(ctx context.Context, customerID, invoi
 	if inv.Status != model.StatusOpen && inv.Status != model.StatusPartiallyPaid {
 		return model.BillingDocument{}, fmt.Errorf("%w: invoice %d is %s and cannot be paid", model.ErrConflict, inv.Number, inv.Status)
 	}
-	gid, err := s.ownCard(ctx, customerID, cardID)
+	gid, card, err := s.ownCard(ctx, customerID, cardID)
 	if err != nil {
 		return model.BillingDocument{}, fmt.Errorf("pay invoice: %w", err)
 	}
@@ -141,7 +141,8 @@ func (s *PaymentMethodService) PayInvoice(ctx context.Context, customerID, invoi
 	if err := s.gw.Charge(ctx, gid, cardID, amount, fmt.Sprintf("invoice-%d-%s", invoiceID, key)); err != nil {
 		return model.BillingDocument{}, fmt.Errorf("charge card: %w", err)
 	}
-	doc, err := s.invoices.RecordPayment(ctx, customerID, invoiceID, amount, key)
+	doc, err := s.invoices.RecordPayment(ctx, customerID, invoiceID, amount, key,
+		model.PaymentSource{Method: model.MethodCard, CardBrand: card.Brand, CardLast4: card.Last4})
 	if err != nil {
 		return model.BillingDocument{}, fmt.Errorf("card charged but payment not booked (key %s): %w", key, err)
 	}

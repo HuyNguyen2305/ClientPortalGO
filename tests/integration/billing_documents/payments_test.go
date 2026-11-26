@@ -175,3 +175,32 @@ func TestConcurrentPaymentsCannotOverpay(t *testing.T) {
 	got := w.do(t, http.MethodGet, docPath("invoices", inv.ID, ""), nil, http.StatusOK)
 	assert.Equal(t, int64(4000), *got.AmountPaidCents)
 }
+
+func TestPaymentMethod(t *testing.T) {
+	w := newWorld(t)
+	inv := w.openInvoice(t, w.location)
+	payments := docPath("invoices", inv.ID, "/payments")
+	methods := func() []string {
+		rows, err := w.app.Pool.Query(t.Context(), `SELECT method FROM payments WHERE billing_document_id = $1 ORDER BY id`, inv.ID)
+		require.NoError(t, err)
+		defer rows.Close()
+		var out []string
+		for rows.Next() {
+			var m string
+			require.NoError(t, rows.Scan(&m))
+			out = append(out, m)
+		}
+		return out
+	}
+
+	w.do(t, http.MethodPost, payments, map[string]any{"amount_cents": 100, "method": "cash"}, http.StatusCreated)
+	w.do(t, http.MethodPost, payments, map[string]any{"amount_cents": 100, "method": "check"}, http.StatusCreated)
+	w.do(t, http.MethodPost, payments, pay(100), http.StatusCreated)
+	assert.Equal(t, []string{"cash", "check", "other"}, methods(), "no method means other")
+
+	t.Run("a card payment is not recorded by hand", func(t *testing.T) {
+		assert.Equal(t, http.StatusBadRequest, w.app.Do(t, http.MethodPost, payments, w.customer, map[string]any{"amount_cents": 100, "method": "card"}).Code)
+		assert.Equal(t, http.StatusBadRequest, w.app.Do(t, http.MethodPost, payments, w.customer, map[string]any{"amount_cents": 100, "method": "bitcoin"}).Code)
+		assert.Len(t, methods(), 3)
+	})
+}

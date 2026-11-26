@@ -137,6 +137,10 @@ func TestPayInvoice(t *testing.T) {
 		}
 		assert.Equal(t, map[string]int64{fmt.Sprintf("invoice-%d-k-1", invoice): 6500}, app.Gateway.Charges)
 		assert.Equal(t, 1, payments())
+		var method, brand, last4 string
+		require.NoError(t, app.Pool.QueryRow(t.Context(),
+			`SELECT method, card_brand, card_last4 FROM payments WHERE billing_document_id = $1`, invoice).Scan(&method, &brand, &last4))
+		assert.Equal(t, []string{"card", "visa", "4242"}, []string{method, brand, last4}, "the card is recorded for reports")
 	})
 
 	t.Run("a paid invoice is a conflict", func(t *testing.T) {

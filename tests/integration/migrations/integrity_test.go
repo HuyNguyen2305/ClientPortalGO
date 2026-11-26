@@ -77,3 +77,27 @@ func TestIntegrityConstraints(t *testing.T) {
 		require.NoError(t, pay(a, nil), "payments without a key never collide")
 	})
 }
+
+func TestPaymentMethodConstraints(t *testing.T) {
+	pool := testdb.New(t)
+	ctx := context.Background()
+	cust, loc := seed(t, pool)
+	doc, err := insertDoc(pool, cust, loc, "invoice", "open", 13, nil)
+	require.NoError(t, err)
+	pay := func(method string, brand, last4 any) error {
+		_, err := pool.Exec(ctx,
+			`INSERT INTO payments (billing_document_id, amount_cents, method, card_brand, card_last4) VALUES ($1, 1, $2, $3, $4)`,
+			doc, method, brand, last4)
+		return err
+	}
+	require.NoError(t, pay("card", "visa", "4242"))
+	require.NoError(t, pay("cash", nil, nil))
+	assert.Equal(t, "23514", pgCode(t, pay("bitcoin", nil, nil)), "unknown method")
+	assert.Equal(t, "23514", pgCode(t, pay("cash", "visa", "4242")), "card details on a cash payment")
+
+	var method string
+	_, err = pool.Exec(ctx, `INSERT INTO payments (billing_document_id, amount_cents) VALUES ($1, 1)`, doc)
+	require.NoError(t, err)
+	require.NoError(t, pool.QueryRow(ctx, `SELECT method FROM payments ORDER BY id DESC LIMIT 1`).Scan(&method))
+	assert.Equal(t, "other", method, "the default")
+}

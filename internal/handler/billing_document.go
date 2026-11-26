@@ -169,7 +169,7 @@ func (h *BillingDocumentHandler) RecordPayment(c *gin.Context) {
 		RespondError(c, fmt.Errorf("%w: Idempotency-Key is longer than %d characters", model.ErrValidation, maxIdempotencyKeyLen))
 		return
 	}
-	doc, err := h.svc.RecordPayment(c.Request.Context(), middleware.CustomerID(c), id, req.AmountCents, key)
+	doc, err := h.svc.RecordPayment(c.Request.Context(), middleware.CustomerID(c), id, req.AmountCents, key, model.PaymentSource{Method: req.Method})
 	if err != nil {
 		RespondError(c, err)
 		return

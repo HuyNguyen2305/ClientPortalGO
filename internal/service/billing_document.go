@@ -29,8 +29,8 @@ type BillingDocumentRepository interface {
 	Delete(ctx context.Context, id int64) error
 	UpdateStatus(ctx context.Context, id int64, status model.Status) error
 	// AddPayment records a payment and moves amount_paid_cents and status with it. An empty
-	// idempotencyKey stores none.
-	AddPayment(ctx context.Context, documentID, amountCents int64, newStatus model.Status, idempotencyKey string) error
+	// idempotencyKey stores none. An empty src.Method is "other".
+	AddPayment(ctx context.Context, documentID, amountCents int64, newStatus model.Status, idempotencyKey string, src model.PaymentSource) error
 	// HasPaymentKey reports whether the invoice already has a payment recorded under the key.
 	HasPaymentKey(ctx context.Context, documentID int64, key string) (bool, error)
 	ListPayments(ctx context.Context, documentID int64) ([]model.Payment, error)
@@ -240,7 +240,10 @@ func (s *BillingDocumentService) Transition(ctx context.Context, customerID int6
 // locked for the whole transaction, so two concurrent payments cannot overpay it.
 // A non-empty idempotencyKey makes a retry a no-op: the invoice comes back unchanged, whatever
 // amount the retry carried.
-func (s *BillingDocumentService) RecordPayment(ctx context.Context, customerID, invoiceID, amountCents int64, idempotencyKey string) (model.BillingDocument, error) {
+func (s *BillingDocumentService) RecordPayment(ctx context.Context, customerID, invoiceID, amountCents int64, idempotencyKey string, src model.PaymentSource) (model.BillingDocument, error) {
+	if err := src.Valid(); err != nil {
+		return model.BillingDocument{}, err
+	}
 	err := s.docs.WithTx(ctx, func(tx BillingDocumentRepository) error {
 		doc, err := tx.GetForUpdate(ctx, customerID, model.ParentInvoice, invoiceID)
 		if err != nil {
@@ -259,7 +262,7 @@ func (s *BillingDocumentService) RecordPayment(ctx context.Context, customerID, 
 		if !model.CanTransition(model.ParentInvoice, doc.Status, next) {
 			return fmt.Errorf("%w: a %s invoice cannot take payments", model.ErrConflict, doc.Status)
 		}
-		return tx.AddPayment(ctx, invoiceID, amountCents, next, idempotencyKey)
+		return tx.AddPayment(ctx, invoiceID, amountCents, next, idempotencyKey, src)
 	})
 	if err != nil {
 		return model.BillingDocument{}, fmt.Errorf("record payment: %w", err)

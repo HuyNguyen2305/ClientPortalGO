@@ -50,16 +50,16 @@ func (_m *MockBillingDocumentRepository) EXPECT() *MockBillingDocumentRepository
 }
 
 // AddPayment provides a mock function for the type MockBillingDocumentRepository
-func (_mock *MockBillingDocumentRepository) AddPayment(ctx context.Context, documentID int64, amountCents int64, newStatus model.Status, idempotencyKey string) error {
-	ret := _mock.Called(ctx, documentID, amountCents, newStatus, idempotencyKey)
+func (_mock *MockBillingDocumentRepository) AddPayment(ctx context.Context, documentID int64, amountCents int64, newStatus model.Status, idempotencyKey string, src model.PaymentSource) error {
+	ret := _mock.Called(ctx, documentID, amountCents, newStatus, idempotencyKey, src)
 
 	if len(ret) == 0 {
 		panic("no return value specified for AddPayment")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64, model.Status, string) error); ok {
-		r0 = returnFunc(ctx, documentID, amountCents, newStatus, idempotencyKey)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64, model.Status, string, model.PaymentSource) error); ok {
+		r0 = returnFunc(ctx, documentID, amountCents, newStatus, idempotencyKey, src)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -77,11 +77,12 @@ type MockBillingDocumentRepository_AddPayment_Call struct {
 //   - amountCents int64
 //   - newStatus model.Status
 //   - idempotencyKey string
-func (_e *MockBillingDocumentRepository_Expecter) AddPayment(ctx any, documentID any, amountCents any, newStatus any, idempotencyKey any) *MockBillingDocumentRepository_AddPayment_Call {
-	return &MockBillingDocumentRepository_AddPayment_Call{Call: _e.mock.On("AddPayment", ctx, documentID, amountCents, newStatus, idempotencyKey)}
+//   - src model.PaymentSource
+func (_e *MockBillingDocumentRepository_Expecter) AddPayment(ctx any, documentID any, amountCents any, newStatus any, idempotencyKey any, src any) *MockBillingDocumentRepository_AddPayment_Call {
+	return &MockBillingDocumentRepository_AddPayment_Call{Call: _e.mock.On("AddPayment", ctx, documentID, amountCents, newStatus, idempotencyKey, src)}
 }
 
-func (_c *MockBillingDocumentRepository_AddPayment_Call) Run(run func(ctx context.Context, documentID int64, amountCents int64, newStatus model.Status, idempotencyKey string)) *MockBillingDocumentRepository_AddPayment_Call {
+func (_c *MockBillingDocumentRepository_AddPayment_Call) Run(run func(ctx context.Context, documentID int64, amountCents int64, newStatus model.Status, idempotencyKey string, src model.PaymentSource)) *MockBillingDocumentRepository_AddPayment_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -103,12 +104,17 @@ func (_c *MockBillingDocumentRepository_AddPayment_Call) Run(run func(ctx contex
 		if args[4] != nil {
 			arg4 = args[4].(string)
 		}
+		var arg5 model.PaymentSource
+		if args[5] != nil {
+			arg5 = args[5].(model.PaymentSource)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
 			arg4,
+			arg5,
 		)
 	})
 	return _c
@@ -119,7 +125,7 @@ func (_c *MockBillingDocumentRepository_AddPayment_Call) Return(err error) *Mock
 	return _c
 }
 
-func (_c *MockBillingDocumentRepository_AddPayment_Call) RunAndReturn(run func(ctx context.Context, documentID int64, amountCents int64, newStatus model.Status, idempotencyKey string) error) *MockBillingDocumentRepository_AddPayment_Call {
+func (_c *MockBillingDocumentRepository_AddPayment_Call) RunAndReturn(run func(ctx context.Context, documentID int64, amountCents int64, newStatus model.Status, idempotencyKey string, src model.PaymentSource) error) *MockBillingDocumentRepository_AddPayment_Call {
 	_c.Call.Return(run)
 	return _c
 }
