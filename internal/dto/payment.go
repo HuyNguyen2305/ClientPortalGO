@@ -9,6 +9,8 @@ import (
 // PaymentRequest is the body for recording a payment.
 type PaymentRequest struct {
 	AmountCents int64 `json:"amount_cents" binding:"required,gt=0"`
+	// Method is how it was paid; empty means "other". A card payment goes through /pay, which knows the card.
+	Method string `json:"method" binding:"omitempty,oneof=cash check other"`
 }
 
 // PaymentResponse is a payment as returned by the API.

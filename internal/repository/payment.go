@@ -10,14 +10,15 @@ import (
 )
 
 // AddPayment records a payment and updates the invoice's paid amount and status. An empty
-// idempotencyKey stores none.
+// idempotencyKey stores none. An empty src.Method is "other".
 // Call it inside WithTx after GetForUpdate, so concurrent payments are serialised.
-func (r *BillingDocuments) AddPayment(ctx context.Context, documentID, amountCents int64, newStatus model.Status, idempotencyKey string) error {
+func (r *BillingDocuments) AddPayment(ctx context.Context, documentID, amountCents int64, newStatus model.Status, idempotencyKey string, src model.PaymentSource) error {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 	if _, err := r.db.Exec(ctx,
-		`INSERT INTO payments (billing_document_id, amount_cents, idempotency_key) VALUES ($1, $2, NULLIF($3, ''))`,
-		documentID, amountCents, idempotencyKey); err != nil {
+		`INSERT INTO payments (billing_document_id, amount_cents, idempotency_key, method, card_brand, card_last4)
+		 VALUES ($1, $2, NULLIF($3, ''), COALESCE(NULLIF($4, ''), 'other'), NULLIF($5, ''), NULLIF($6, ''))`,
+		documentID, amountCents, idempotencyKey, src.Method, src.CardBrand, src.CardLast4); err != nil {
 		return fmt.Errorf("insert payment: %w", mapErr(err))
 	}
 	if _, err := r.db.Exec(ctx,

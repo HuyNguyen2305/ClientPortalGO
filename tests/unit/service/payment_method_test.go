@@ -82,7 +82,7 @@ func TestPaymentMethodService_Delete(t *testing.T) {
 			links, gw := mocks.NewMockGatewayLinkRepository(t), mocks.NewMockPaymentGateway(t)
 			links.EXPECT().StripeID(mock.Anything, int64(3)).Return(tt.stripeID, nil)
 			if tt.stripeID != "" {
-				gw.EXPECT().ListCards(mock.Anything, tt.stripeID).Return([]model.Card{{ID: "pm_1"}}, nil)
+				gw.EXPECT().ListCards(mock.Anything, tt.stripeID).Return([]model.Card{{ID: "pm_1", Brand: "visa", Last4: "4242"}}, nil)
 			}
 			if tt.detach {
 				gw.EXPECT().DetachCard(mock.Anything, tt.cardID).Return(nil)
@@ -112,14 +112,14 @@ func TestPaymentMethodService_PayInvoice(t *testing.T) {
 		charges   bool
 		books     bool
 	}{
-		{"open invoice is charged its balance due and booked", model.StatusOpen, []model.Card{{ID: "pm_1"}}, nil, nil, nil, true, true},
-		{"partially paid invoice can be paid", model.StatusPartiallyPaid, []model.Card{{ID: "pm_1"}}, nil, nil, nil, true, true},
+		{"open invoice is charged its balance due and booked", model.StatusOpen, []model.Card{{ID: "pm_1", Brand: "visa", Last4: "4242"}}, nil, nil, nil, true, true},
+		{"partially paid invoice can be paid", model.StatusPartiallyPaid, []model.Card{{ID: "pm_1", Brand: "visa", Last4: "4242"}}, nil, nil, nil, true, true},
 		{"draft is a conflict and never charged", model.StatusDraft, nil, nil, nil, model.ErrConflict, false, false},
 		{"paid is a conflict and never charged", model.StatusPaid, nil, nil, nil, model.ErrConflict, false, false},
 		{"void is a conflict and never charged", model.StatusVoid, nil, nil, nil, model.ErrConflict, false, false},
 		{"someone else's card is not found and never charged", model.StatusOpen, []model.Card{{ID: "pm_other"}}, nil, nil, model.ErrNotFound, false, false},
-		{"a decline books nothing", model.StatusOpen, []model.Card{{ID: "pm_1"}}, declined, nil, model.ErrPaymentFailed, true, false},
-		{"a booking failure after the charge is returned", model.StatusOpen, []model.Card{{ID: "pm_1"}}, nil, model.ErrConflict, model.ErrConflict, true, true},
+		{"a decline books nothing", model.StatusOpen, []model.Card{{ID: "pm_1", Brand: "visa", Last4: "4242"}}, declined, nil, model.ErrPaymentFailed, true, false},
+		{"a booking failure after the charge is returned", model.StatusOpen, []model.Card{{ID: "pm_1", Brand: "visa", Last4: "4242"}}, nil, model.ErrConflict, model.ErrConflict, true, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -134,7 +134,7 @@ func TestPaymentMethodService_PayInvoice(t *testing.T) {
 				gw.EXPECT().Charge(mock.Anything, "cus_1", "pm_1", int64(5000), "invoice-9-key-1").Return(tt.chargeErr)
 			}
 			if tt.books {
-				inv.EXPECT().RecordPayment(mock.Anything, int64(3), int64(9), int64(5000), "key-1").
+				inv.EXPECT().RecordPayment(mock.Anything, int64(3), int64(9), int64(5000), "key-1", visa4242).
 					Return(model.BillingDocument{ID: 9}, tt.bookErr)
 			}
 			_, err := service.NewPaymentMethodService(links, gw, inv).PayInvoice(context.Background(), 3, 9, "pm_1", "key-1")
@@ -150,13 +150,13 @@ func TestPaymentMethodService_PayInvoice(t *testing.T) {
 func TestPaymentMethodService_PayInvoice_SameKeyOnTwoInvoicesChargesWithDifferentGatewayKeys(t *testing.T) {
 	links, gw, inv := mocks.NewMockGatewayLinkRepository(t), mocks.NewMockPaymentGateway(t), mocks.NewMockInvoiceBooker(t)
 	links.EXPECT().StripeID(mock.Anything, int64(3)).Return("cus_1", nil)
-	gw.EXPECT().ListCards(mock.Anything, "cus_1").Return([]model.Card{{ID: "pm_1"}}, nil)
+	gw.EXPECT().ListCards(mock.Anything, "cus_1").Return([]model.Card{{ID: "pm_1", Brand: "visa", Last4: "4242"}}, nil)
 	for _, id := range []int64{9, 10} {
 		open := model.BillingDocument{ID: id, Status: model.StatusOpen, TotalCents: 5000}
 		inv.EXPECT().Get(mock.Anything, int64(3), model.ParentInvoice, id).Return(open, nil)
 		inv.EXPECT().PaymentRecorded(mock.Anything, int64(3), id, "key-1").Return(false, nil)
 		gw.EXPECT().Charge(mock.Anything, "cus_1", "pm_1", int64(5000), fmt.Sprintf("invoice-%d-key-1", id)).Return(nil)
-		inv.EXPECT().RecordPayment(mock.Anything, int64(3), id, int64(5000), "key-1").Return(open, nil)
+		inv.EXPECT().RecordPayment(mock.Anything, int64(3), id, int64(5000), "key-1", visa4242).Return(open, nil)
 	}
 	svc := service.NewPaymentMethodService(links, gw, inv)
 	for _, id := range []int64{9, 10} {
@@ -174,3 +174,6 @@ func TestPaymentMethodService_PayInvoice_RetryDoesNotChargeAgain(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, paid, got)
 }
+
+// visa4242 is how a payment with the test cards above is booked: as a card payment with the card's summary.
+var visa4242 = model.PaymentSource{Method: model.MethodCard, CardBrand: "visa", CardLast4: "4242"}

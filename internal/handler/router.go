@@ -119,6 +119,7 @@ func NewRouter(d Deps) *gin.Engine {
 	scoped.GET("/services/:id/slots", bookings.slots)
 	scoped.POST("/bookings", bookings.create)
 	scoped.POST("/booking-series", bookings.createSeries)
+	scoped.DELETE("/booking-series/:id", bookings.endSeries)
 	scoped.GET("/bookings", bookings.list)
 	scoped.GET("/bookings/:id", bookings.get)
 	scoped.POST("/bookings/:id/cancel", bookings.cancel)

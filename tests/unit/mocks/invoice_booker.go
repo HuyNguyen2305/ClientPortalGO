@@ -204,8 +204,8 @@ func (_c *MockInvoiceBooker_PaymentRecorded_Call) RunAndReturn(run func(ctx cont
 }
 
 // RecordPayment provides a mock function for the type MockInvoiceBooker
-func (_mock *MockInvoiceBooker) RecordPayment(ctx context.Context, customerID int64, invoiceID int64, amountCents int64, idempotencyKey string) (model.BillingDocument, error) {
-	ret := _mock.Called(ctx, customerID, invoiceID, amountCents, idempotencyKey)
+func (_mock *MockInvoiceBooker) RecordPayment(ctx context.Context, customerID int64, invoiceID int64, amountCents int64, idempotencyKey string, src model.PaymentSource) (model.BillingDocument, error) {
+	ret := _mock.Called(ctx, customerID, invoiceID, amountCents, idempotencyKey, src)
 
 	if len(ret) == 0 {
 		panic("no return value specified for RecordPayment")
@@ -213,16 +213,16 @@ func (_mock *MockInvoiceBooker) RecordPayment(ctx context.Context, customerID in
 
 	var r0 model.BillingDocument
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64, int64, string) (model.BillingDocument, error)); ok {
-		return returnFunc(ctx, customerID, invoiceID, amountCents, idempotencyKey)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64, int64, string, model.PaymentSource) (model.BillingDocument, error)); ok {
+		return returnFunc(ctx, customerID, invoiceID, amountCents, idempotencyKey, src)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64, int64, string) model.BillingDocument); ok {
-		r0 = returnFunc(ctx, customerID, invoiceID, amountCents, idempotencyKey)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64, int64, string, model.PaymentSource) model.BillingDocument); ok {
+		r0 = returnFunc(ctx, customerID, invoiceID, amountCents, idempotencyKey, src)
 	} else {
 		r0 = ret.Get(0).(model.BillingDocument)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, int64, int64, int64, string) error); ok {
-		r1 = returnFunc(ctx, customerID, invoiceID, amountCents, idempotencyKey)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64, int64, int64, string, model.PaymentSource) error); ok {
+		r1 = returnFunc(ctx, customerID, invoiceID, amountCents, idempotencyKey, src)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -240,11 +240,12 @@ type MockInvoiceBooker_RecordPayment_Call struct {
 //   - invoiceID int64
 //   - amountCents int64
 //   - idempotencyKey string
-func (_e *MockInvoiceBooker_Expecter) RecordPayment(ctx any, customerID any, invoiceID any, amountCents any, idempotencyKey any) *MockInvoiceBooker_RecordPayment_Call {
-	return &MockInvoiceBooker_RecordPayment_Call{Call: _e.mock.On("RecordPayment", ctx, customerID, invoiceID, amountCents, idempotencyKey)}
+//   - src model.PaymentSource
+func (_e *MockInvoiceBooker_Expecter) RecordPayment(ctx any, customerID any, invoiceID any, amountCents any, idempotencyKey any, src any) *MockInvoiceBooker_RecordPayment_Call {
+	return &MockInvoiceBooker_RecordPayment_Call{Call: _e.mock.On("RecordPayment", ctx, customerID, invoiceID, amountCents, idempotencyKey, src)}
 }
 
-func (_c *MockInvoiceBooker_RecordPayment_Call) Run(run func(ctx context.Context, customerID int64, invoiceID int64, amountCents int64, idempotencyKey string)) *MockInvoiceBooker_RecordPayment_Call {
+func (_c *MockInvoiceBooker_RecordPayment_Call) Run(run func(ctx context.Context, customerID int64, invoiceID int64, amountCents int64, idempotencyKey string, src model.PaymentSource)) *MockInvoiceBooker_RecordPayment_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -266,12 +267,17 @@ func (_c *MockInvoiceBooker_RecordPayment_Call) Run(run func(ctx context.Context
 		if args[4] != nil {
 			arg4 = args[4].(string)
 		}
+		var arg5 model.PaymentSource
+		if args[5] != nil {
+			arg5 = args[5].(model.PaymentSource)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
 			arg4,
+			arg5,
 		)
 	})
 	return _c
@@ -282,7 +288,7 @@ func (_c *MockInvoiceBooker_RecordPayment_Call) Return(billingDocument model.Bil
 	return _c
 }
 
-func (_c *MockInvoiceBooker_RecordPayment_Call) RunAndReturn(run func(ctx context.Context, customerID int64, invoiceID int64, amountCents int64, idempotencyKey string) (model.BillingDocument, error)) *MockInvoiceBooker_RecordPayment_Call {
+func (_c *MockInvoiceBooker_RecordPayment_Call) RunAndReturn(run func(ctx context.Context, customerID int64, invoiceID int64, amountCents int64, idempotencyKey string, src model.PaymentSource) (model.BillingDocument, error)) *MockInvoiceBooker_RecordPayment_Call {
 	_c.Call.Return(run)
 	return _c
 }

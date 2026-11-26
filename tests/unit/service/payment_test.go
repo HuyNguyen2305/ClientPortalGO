@@ -35,12 +35,12 @@ func TestRecordPayment(t *testing.T) {
 			f.docs.EXPECT().GetForUpdate(mock.Anything, custID, model.ParentInvoice, int64(9)).
 				Return(model.BillingDocument{ID: 9, ParentType: model.ParentInvoice, Status: tt.status, TotalCents: 6500, AmountPaidCents: tt.paid}, nil)
 			if tt.wantStatus != "" {
-				f.docs.EXPECT().AddPayment(mock.Anything, int64(9), tt.amount, tt.wantStatus, "").Return(nil).Once()
+				f.docs.EXPECT().AddPayment(mock.Anything, int64(9), tt.amount, tt.wantStatus, "", model.PaymentSource{}).Return(nil).Once()
 				f.docs.EXPECT().Get(mock.Anything, custID, model.ParentInvoice, int64(9)).Return(model.BillingDocument{ID: 9}, nil)
 				f.docs.EXPECT().ListItems(mock.Anything, int64(9)).Return(nil, nil)
 			}
 
-			_, err := f.svc.RecordPayment(context.Background(), custID, 9, tt.amount, "")
+			_, err := f.svc.RecordPayment(context.Background(), custID, 9, tt.amount, "", model.PaymentSource{})
 			if tt.wantStatus == "" {
 				assert.True(t, errors.Is(err, model.ErrConflict), "got %v", err)
 				return
@@ -61,9 +61,9 @@ func TestRecordPayment_IdempotencyKey(t *testing.T) {
 		f := newDocFixture(t)
 		f.docs.EXPECT().GetForUpdate(mock.Anything, custID, model.ParentInvoice, int64(9)).Return(open, nil)
 		f.docs.EXPECT().HasPaymentKey(mock.Anything, int64(9), "k1").Return(false, nil)
-		f.docs.EXPECT().AddPayment(mock.Anything, int64(9), int64(1000), model.StatusPartiallyPaid, "k1").Return(nil).Once()
+		f.docs.EXPECT().AddPayment(mock.Anything, int64(9), int64(1000), model.StatusPartiallyPaid, "k1", model.PaymentSource{}).Return(nil).Once()
 		returnsInvoice(f)
-		_, err := f.svc.RecordPayment(context.Background(), custID, 9, 1000, "k1")
+		_, err := f.svc.RecordPayment(context.Background(), custID, 9, 1000, "k1", model.PaymentSource{})
 		require.NoError(t, err)
 	})
 
@@ -74,7 +74,7 @@ func TestRecordPayment_IdempotencyKey(t *testing.T) {
 		f.docs.EXPECT().GetForUpdate(mock.Anything, custID, model.ParentInvoice, int64(9)).Return(paid, nil)
 		f.docs.EXPECT().HasPaymentKey(mock.Anything, int64(9), "k1").Return(true, nil)
 		returnsInvoice(f) // AddPayment is not expected: the mock fails the test if it is called
-		_, err := f.svc.RecordPayment(context.Background(), custID, 9, 6500, "k1")
+		_, err := f.svc.RecordPayment(context.Background(), custID, 9, 6500, "k1", model.PaymentSource{})
 		require.NoError(t, err)
 	})
 
@@ -82,7 +82,7 @@ func TestRecordPayment_IdempotencyKey(t *testing.T) {
 		f := newDocFixture(t)
 		f.docs.EXPECT().GetForUpdate(mock.Anything, custID, model.ParentInvoice, int64(9)).Return(open, nil)
 		f.docs.EXPECT().HasPaymentKey(mock.Anything, int64(9), "k1").Return(false, errors.New("db down"))
-		_, err := f.svc.RecordPayment(context.Background(), custID, 9, 1000, "k1")
+		_, err := f.svc.RecordPayment(context.Background(), custID, 9, 1000, "k1", model.PaymentSource{})
 		assert.Error(t, err)
 	})
 }
@@ -101,4 +101,38 @@ func TestBalance(t *testing.T) {
 	got, err := f.svc.Balance(context.Background(), custID, &loc)
 	require.NoError(t, err)
 	assert.Equal(t, int64(12000), got)
+}
+
+func TestRecordPayment_Source(t *testing.T) {
+	open := model.BillingDocument{ID: 9, ParentType: model.ParentInvoice, Status: model.StatusOpen, TotalCents: 6500}
+	tests := []struct {
+		name    string
+		src     model.PaymentSource
+		wantErr bool
+	}{
+		{"cash", model.PaymentSource{Method: model.MethodCash}, false},
+		{"check", model.PaymentSource{Method: model.MethodCheck}, false},
+		{"unspecified", model.PaymentSource{}, false},
+		{"card with its summary", model.PaymentSource{Method: model.MethodCard, CardBrand: "visa", CardLast4: "4242"}, false},
+		{"unknown method", model.PaymentSource{Method: "bitcoin"}, true},
+		{"card details on cash", model.PaymentSource{Method: model.MethodCash, CardLast4: "4242"}, true},
+		{"card details with no method", model.PaymentSource{CardBrand: "visa"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newDocFixture(t)
+			if !tt.wantErr {
+				f.docs.EXPECT().GetForUpdate(mock.Anything, custID, model.ParentInvoice, int64(9)).Return(open, nil)
+				f.docs.EXPECT().AddPayment(mock.Anything, int64(9), int64(1000), model.StatusPartiallyPaid, "", tt.src).Return(nil).Once()
+				f.docs.EXPECT().Get(mock.Anything, custID, model.ParentInvoice, int64(9)).Return(model.BillingDocument{ID: 9}, nil)
+				f.docs.EXPECT().ListItems(mock.Anything, int64(9)).Return(nil, nil)
+			}
+			_, err := f.svc.RecordPayment(context.Background(), custID, 9, 1000, "", tt.src)
+			if tt.wantErr {
+				assert.ErrorIs(t, err, model.ErrValidation)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
 }

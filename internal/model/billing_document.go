@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"slices"
 	"time"
 )
@@ -133,4 +134,34 @@ type DocumentFilter struct {
 	Status     *Status
 	After      *DocumentCursor
 	Limit      int
+}
+
+// Payment methods.
+const (
+	MethodCash  = "cash"
+	MethodCheck = "check"
+	MethodCard  = "card"
+	MethodOther = "other"
+)
+
+// PaymentSource is how a payment was made: its method and, for a card, the card's summary. The zero value
+// means MethodOther.
+type PaymentSource struct {
+	Method    string
+	CardBrand string
+	CardLast4 string
+}
+
+// Valid fails with ErrValidation unless the method is known and card details only come with a card.
+func (p PaymentSource) Valid() error {
+	switch p.Method {
+	case "", MethodCash, MethodCheck, MethodOther:
+		if p.CardBrand != "" || p.CardLast4 != "" {
+			return fmt.Errorf("%w: card details only go with a card payment", ErrValidation)
+		}
+	case MethodCard:
+	default:
+		return fmt.Errorf("%w: unknown payment method %q", ErrValidation, p.Method)
+	}
+	return nil
 }
