@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -84,34 +85,108 @@ func (r *BillingDocuments) CreateBooking(ctx context.Context, b model.Booking) (
 	return id, nil
 }
 
-// CreateSeries inserts the series the jobs of a recurring booking point at.
-func (r *BillingDocuments) CreateSeries(ctx context.Context, customerID, locationID, serviceID int64, firstStart time.Time) (int64, error) {
+// CreateSeries inserts the series the jobs of a recurring booking point at; no job is placed
+// yet, and generatedThrough is the date before the first one.
+func (r *BillingDocuments) CreateSeries(ctx context.Context, customerID, locationID, serviceID int64, firstStart, generatedThrough time.Time) (int64, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 	var id int64
 	err := r.db.QueryRow(ctx,
-		`INSERT INTO booking_series (customer_id, location_id, service_id, first_starts_at)
-		 VALUES ($1, $2, $3, $4) RETURNING id`, customerID, locationID, serviceID, firstStart).Scan(&id)
+		`INSERT INTO booking_series (customer_id, location_id, service_id, first_starts_at, generated_through)
+		 VALUES ($1, $2, $3, $4, $5) RETURNING id`, customerID, locationID, serviceID, firstStart, generatedThrough).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("insert booking series: %w", mapErr(err))
 	}
 	return id, nil
 }
 
-// ListSeriesBookings returns the jobs of one of the customer's series, soonest first.
-func (r *BillingDocuments) ListSeriesBookings(ctx context.Context, customerID, seriesID int64) ([]model.Booking, error) {
+// HasLiveSeries reports whether the customer has a series of the service that has not ended.
+func (r *BillingDocuments) HasLiveSeries(ctx context.Context, customerID, serviceID int64) (bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
-	rows, err := r.db.Query(ctx, bookingSelect+`
-		WHERE b.series_id = $1 AND b.customer_id = $2 ORDER BY b.starts_at`, seriesID, customerID)
-	if err != nil {
-		return nil, fmt.Errorf("list series bookings: %w", err)
+	var found bool
+	if err := r.db.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM booking_series
+		                WHERE customer_id = $1 AND service_id = $2 AND ended_at IS NULL)`, customerID, serviceID).Scan(&found); err != nil {
+		return false, fmt.Errorf("check live series: %w", err)
 	}
-	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (model.Booking, error) { return scanBooking(row) })
+	return found, nil
+}
+
+// EndSeries ends the customer's running series so it places no more jobs; a missing, foreign or
+// already ended series is ErrNotFound.
+func (r *BillingDocuments) EndSeries(ctx context.Context, customerID, id int64) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	tag, err := r.db.Exec(ctx,
+		`UPDATE booking_series SET ended_at = now() WHERE id = $1 AND customer_id = $2 AND ended_at IS NULL`, id, customerID)
 	if err != nil {
-		return nil, fmt.Errorf("list series bookings: %w", err)
+		return fmt.Errorf("end series %d: %w", id, err)
 	}
-	return out, nil
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("series %d: %w", id, model.ErrNotFound)
+	}
+	return nil
+}
+
+// ListDueSeries returns the ids of running series with dates after their cursor up to `through`.
+func (r *BillingDocuments) ListDueSeries(ctx context.Context, through time.Time) ([]int64, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	rows, err := r.db.Query(ctx,
+		`SELECT id FROM booking_series WHERE ended_at IS NULL AND generated_through < $1 ORDER BY id`, through)
+	if err != nil {
+		return nil, fmt.Errorf("list due series: %w", err)
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	if err != nil {
+		return nil, fmt.Errorf("list due series: %w", err)
+	}
+	return ids, nil
+}
+
+// LockSeries returns a running series and locks it until the transaction ends. One another
+// instance holds, or one that has ended, is ErrNotFound.
+func (r *BillingDocuments) LockSeries(ctx context.Context, id int64) (model.SeriesRun, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	var s model.SeriesRun
+	err := r.db.QueryRow(ctx,
+		`SELECT id, service_id, customer_id, location_id, first_starts_at, generated_through
+		 FROM booking_series WHERE id = $1 AND ended_at IS NULL FOR UPDATE SKIP LOCKED`, id).
+		Scan(&s.ID, &s.ServiceID, &s.CustomerID, &s.LocationID, &s.FirstStart, &s.GeneratedThrough)
+	if err != nil {
+		return model.SeriesRun{}, fmt.Errorf("lock series %d: %w", id, mapErr(err))
+	}
+	return s, nil
+}
+
+// AdvanceSeries moves the series cursor to `through`, and ends the series when done.
+func (r *BillingDocuments) AdvanceSeries(ctx context.Context, id int64, through time.Time, done bool) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	if _, err := r.db.Exec(ctx,
+		`UPDATE booking_series SET generated_through = $2,
+		        ended_at = CASE WHEN $3 THEN now() ELSE ended_at END WHERE id = $1`, id, through, done); err != nil {
+		return fmt.Errorf("advance series %d: %w", id, err)
+	}
+	return nil
+}
+
+// SeriesJobEstimate returns the customer and estimate of a booking that is a job of a series;
+// ok is false for any other booking.
+func (r *BillingDocuments) SeriesJobEstimate(ctx context.Context, bookingID int64) (customerID, estimateID int64, ok bool, err error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	err = r.db.QueryRow(ctx,
+		`SELECT customer_id, estimate_id FROM bookings WHERE id = $1 AND series_id IS NOT NULL`, bookingID).Scan(&customerID, &estimateID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, 0, false, nil
+	}
+	if err != nil {
+		return 0, 0, false, fmt.Errorf("series job of booking %d: %w", bookingID, err)
+	}
+	return customerID, estimateID, true, nil
 }
 
 // CancelBookingForEstimate cancels the live booking that created the estimate; no booking is fine.

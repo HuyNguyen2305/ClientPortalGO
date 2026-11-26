@@ -67,6 +67,23 @@ func run(log *slog.Logger) error {
 		IdleTimeout:       60 * time.Second,
 	}
 
+	// Places each recurring job as its date comes due; safe beside other instances (rows are locked).
+	go func() {
+		jobs := app.NewBookings(pool, cfg)
+		tick := time.NewTicker(time.Minute)
+		defer tick.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-tick.C:
+				if err := jobs.GenerateDue(ctx); err != nil && ctx.Err() == nil {
+					log.Error("recurring jobs", "err", err)
+				}
+			}
+		}
+	}()
+
 	errCh := make(chan error, 1)
 	go func() {
 		log.Info("listening", "addr", srv.Addr)

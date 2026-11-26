@@ -32,7 +32,7 @@ func docRouter(t *testing.T) http.Handler {
 	locs := mocks.NewMockLocationRepository(t)
 	docs := mocks.NewMockBillingDocumentRepository(t)
 	services := mocks.NewMockServiceRepository(t)
-	hours := model.Hours{Loc: time.UTC, Open: 7 * 60, Close: 17 * 60, Step: 15, HorizonDays: 90}
+	hours := model.Hours{Loc: time.UTC, Open: 7 * 60, Close: 17 * 60, Step: 15, HorizonDays: 90, LeadHours: 24}
 	return handler.NewRouter(handler.Deps{
 		Log:       quietLog(),
 		AdminKey:  testAdminKey,

@@ -60,7 +60,7 @@ func TestLoad(t *testing.T) {
 }
 
 func TestLoadBookingHours(t *testing.T) {
-	keys := []string{"BUSINESS_TZ", "BOOKING_OPEN", "BOOKING_CLOSE", "BOOKING_STEP_MINUTES", "BOOKING_HORIZON_DAYS"}
+	keys := []string{"BUSINESS_TZ", "BOOKING_OPEN", "BOOKING_CLOSE", "BOOKING_STEP_MINUTES", "BOOKING_HORIZON_DAYS", "JOB_LEAD_HOURS"}
 	set := func(t *testing.T, env map[string]string) {
 		t.Setenv("DATABASE_URL", "postgres://x")
 		t.Setenv("ADMIN_API_KEY", adminKey)
@@ -79,11 +79,12 @@ func TestLoadBookingHours(t *testing.T) {
 		assert.Equal(t, 17*60, h.Close)
 		assert.Equal(t, 15, h.Step)
 		assert.Equal(t, 90, h.HorizonDays)
+		assert.Equal(t, 24, h.LeadHours)
 	})
 
 	t.Run("overrides", func(t *testing.T) {
 		set(t, map[string]string{"BUSINESS_TZ": "Asia/Ho_Chi_Minh", "BOOKING_OPEN": "08:30", "BOOKING_CLOSE": "18:00",
-			"BOOKING_STEP_MINUTES": "30", "BOOKING_HORIZON_DAYS": "30"})
+			"BOOKING_STEP_MINUTES": "30", "BOOKING_HORIZON_DAYS": "30", "JOB_LEAD_HOURS": "12"})
 		cfg, err := config.Load()
 		require.NoError(t, err)
 		assert.Equal(t, "Asia/Ho_Chi_Minh", cfg.Hours.Loc.String())
@@ -91,6 +92,7 @@ func TestLoadBookingHours(t *testing.T) {
 		assert.Equal(t, 18*60, cfg.Hours.Close)
 		assert.Equal(t, 30, cfg.Hours.Step)
 		assert.Equal(t, 30, cfg.Hours.HorizonDays)
+		assert.Equal(t, 12, cfg.Hours.LeadHours)
 	})
 
 	for name, env := range map[string]map[string]string{
@@ -100,6 +102,7 @@ func TestLoadBookingHours(t *testing.T) {
 		"zero step":           {"BOOKING_STEP_MINUTES": "0"},
 		"step not 15-aligned": {"BOOKING_STEP_MINUTES": "20"},
 		"zero horizon":        {"BOOKING_HORIZON_DAYS": "0"},
+		"zero lead":           {"JOB_LEAD_HOURS": "0"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			set(t, env)

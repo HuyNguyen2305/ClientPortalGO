@@ -26,6 +26,7 @@ import (
 	"clientportal/internal/app"
 	"clientportal/internal/config"
 	"clientportal/internal/model"
+	"clientportal/internal/service"
 	"clientportal/tests/integration/testdb"
 )
 
@@ -35,6 +36,7 @@ type App struct {
 	Pool    *pgxpool.Pool
 	Gateway *FakeGateway
 	Mailer  *FakeMailer
+	Jobs    *service.BookingService // its GenerateDue is what the ticker in main calls
 }
 
 // Mail is one email the fake mailer was asked to send.
@@ -72,7 +74,7 @@ var Hours = func() model.Hours {
 	if err != nil {
 		panic(err)
 	}
-	return model.Hours{Loc: loc, Open: 7 * 60, Close: 17 * 60, Step: 15, HorizonDays: 90}
+	return model.Hours{Loc: loc, Open: 7 * 60, Close: 17 * 60, Step: 15, HorizonDays: 90, LeadHours: 24}
 }()
 
 // New starts the API on a fresh, migrated database.
@@ -84,7 +86,7 @@ func New(t *testing.T) *App {
 	cfg := config.Config{AdminAPIKey: AdminKey, QueryTimeout: 5 * time.Second, SessionTTL: time.Hour, ResetURLBase: ResetURL, Hours: Hours, MaxLiveBookings: 3}
 	gw := &FakeGateway{Cards: map[string][]model.Card{}, Charges: map[string]int64{}}
 	mailer := &FakeMailer{}
-	return &App{Handler: app.New(pool, cfg, log, gw, mailer), Pool: pool, Gateway: gw, Mailer: mailer}
+	return &App{Handler: app.New(pool, cfg, log, gw, mailer), Pool: pool, Gateway: gw, Mailer: mailer, Jobs: app.NewBookings(pool, cfg)}
 }
 
 // FakeGateway is an in-memory payment gateway: no network, no Stripe key.

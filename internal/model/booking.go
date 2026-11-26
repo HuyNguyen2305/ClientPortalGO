@@ -63,12 +63,15 @@ func (b Booking) WorkStatus() WorkStatus {
 	return b.Work
 }
 
-// BookingSeries is a customer's recurring booking: its jobs, and the dates skipped because the
-// slot was taken.
-type BookingSeries struct {
-	ID      int64
-	Jobs    []Booking
-	Skipped []time.Time // calendar dates, midnight UTC
+// SeriesRun is a customer's recurring booking as the job generator sees it. Its jobs are bookings
+// placed one by one as their dates come due.
+type SeriesRun struct {
+	ID               int64
+	ServiceID        int64
+	CustomerID       int64
+	LocationID       int64
+	FirstStart       time.Time
+	GeneratedThrough time.Time // the last calendar date placed or skipped, midnight UTC
 }
 
 // BookingInput is a customer's booking request; Date and Time are business-local.
@@ -92,6 +95,7 @@ type Hours struct {
 	Close       int
 	Step        int
 	HorizonDays int
+	LeadHours   int // a recurring job is placed this long before it starts
 }
 
 // Dates are calendar dates held as midnight UTC, the same convention as document dates.
@@ -104,6 +108,23 @@ func ParseDate(s string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("%w: date must be a real YYYY-MM-DD date", ErrValidation)
 	}
 	return d, nil
+}
+
+// LocalDay is the calendar date of t in the business timezone, held as midnight UTC.
+func (h Hours) LocalDay(t time.Time) time.Time {
+	y, m, d := t.In(h.Loc).Date()
+	return civil(y, m, d)
+}
+
+// DueThrough is the last date whose recurring job should be placed by now.
+func (h Hours) DueThrough(now time.Time) time.Time {
+	return h.LocalDay(now.Add(time.Duration(h.LeadHours) * time.Hour))
+}
+
+// SameTime is the start time on day at the business-local time of day that `from` has.
+func (h Hours) SameTime(day, from time.Time) time.Time {
+	l := from.In(h.Loc)
+	return h.at(day, l.Hour()*60+l.Minute())
 }
 
 // BookableRange is the first and last bookable date: tomorrow through today + HorizonDays,

@@ -74,20 +74,9 @@ func FromBooking(b model.Booking, loc *time.Location) BookingResponse {
 	}
 }
 
-// SeriesResponse is a recurring booking: its jobs, and the dates skipped because the slot was taken.
+// SeriesResponse is a recurring booking. Its jobs appear in the work orders as their dates come due.
 type SeriesResponse struct {
-	ID      int64             `json:"id"`
-	Jobs    []BookingResponse `json:"jobs"`
-	Skipped []string          `json:"skipped"`
-}
-
-// FromSeries maps a series, showing its times in the business timezone loc.
-func FromSeries(s model.BookingSeries, loc *time.Location) SeriesResponse {
-	return SeriesResponse{
-		ID:      s.ID,
-		Jobs:    MapSlice(s.Jobs, func(b model.Booking) BookingResponse { return FromBooking(b, loc) }),
-		Skipped: MapSlice(s.Skipped, func(d time.Time) string { return d.Format(time.DateOnly) }),
-	}
+	ID int64 `json:"id"`
 }
 
 // Day is one entry of the day picker.

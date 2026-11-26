@@ -75,6 +75,9 @@ func TestStartAndComplete(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				f := newBookingFixture(t)
 				f.docs.EXPECT().AdvanceWork(mock.Anything, int64(9), tt.from, tt.to, tt.notes).Return(repoErr)
+				if repoErr == nil && tt.to == model.WorkCompleted { // completing also looks for a series job to bill
+					f.docs.EXPECT().SeriesJobEstimate(mock.Anything, int64(9)).Return(0, 0, false, nil)
+				}
 				err := tt.run(f)
 				if repoErr == nil {
 					assert.NoError(t, err)

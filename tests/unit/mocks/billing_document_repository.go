@@ -124,6 +124,75 @@ func (_c *MockBillingDocumentRepository_AddPayment_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// AdvanceSeries provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) AdvanceSeries(ctx context.Context, id int64, through time.Time, done bool) error {
+	ret := _mock.Called(ctx, id, through, done)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AdvanceSeries")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, time.Time, bool) error); ok {
+		r0 = returnFunc(ctx, id, through, done)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockBillingDocumentRepository_AdvanceSeries_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AdvanceSeries'
+type MockBillingDocumentRepository_AdvanceSeries_Call struct {
+	*mock.Call
+}
+
+// AdvanceSeries is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+//   - through time.Time
+//   - done bool
+func (_e *MockBillingDocumentRepository_Expecter) AdvanceSeries(ctx any, id any, through any, done any) *MockBillingDocumentRepository_AdvanceSeries_Call {
+	return &MockBillingDocumentRepository_AdvanceSeries_Call{Call: _e.mock.On("AdvanceSeries", ctx, id, through, done)}
+}
+
+func (_c *MockBillingDocumentRepository_AdvanceSeries_Call) Run(run func(ctx context.Context, id int64, through time.Time, done bool)) *MockBillingDocumentRepository_AdvanceSeries_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		var arg3 bool
+		if args[3] != nil {
+			arg3 = args[3].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_AdvanceSeries_Call) Return(err error) *MockBillingDocumentRepository_AdvanceSeries_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_AdvanceSeries_Call) RunAndReturn(run func(ctx context.Context, id int64, through time.Time, done bool) error) *MockBillingDocumentRepository_AdvanceSeries_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // AdvanceWork provides a mock function for the type MockBillingDocumentRepository
 func (_mock *MockBillingDocumentRepository) AdvanceWork(ctx context.Context, id int64, from model.WorkStatus, to model.WorkStatus, notes *string) error {
 	ret := _mock.Called(ctx, id, from, to, notes)
@@ -535,8 +604,8 @@ func (_c *MockBillingDocumentRepository_CreateBooking_Call) RunAndReturn(run fun
 }
 
 // CreateSeries provides a mock function for the type MockBillingDocumentRepository
-func (_mock *MockBillingDocumentRepository) CreateSeries(ctx context.Context, customerID int64, locationID int64, serviceID int64, firstStart time.Time) (int64, error) {
-	ret := _mock.Called(ctx, customerID, locationID, serviceID, firstStart)
+func (_mock *MockBillingDocumentRepository) CreateSeries(ctx context.Context, customerID int64, locationID int64, serviceID int64, firstStart time.Time, generatedThrough time.Time) (int64, error) {
+	ret := _mock.Called(ctx, customerID, locationID, serviceID, firstStart, generatedThrough)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateSeries")
@@ -544,16 +613,16 @@ func (_mock *MockBillingDocumentRepository) CreateSeries(ctx context.Context, cu
 
 	var r0 int64
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64, int64, time.Time) (int64, error)); ok {
-		return returnFunc(ctx, customerID, locationID, serviceID, firstStart)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64, int64, time.Time, time.Time) (int64, error)); ok {
+		return returnFunc(ctx, customerID, locationID, serviceID, firstStart, generatedThrough)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64, int64, time.Time) int64); ok {
-		r0 = returnFunc(ctx, customerID, locationID, serviceID, firstStart)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64, int64, time.Time, time.Time) int64); ok {
+		r0 = returnFunc(ctx, customerID, locationID, serviceID, firstStart, generatedThrough)
 	} else {
 		r0 = ret.Get(0).(int64)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, int64, int64, int64, time.Time) error); ok {
-		r1 = returnFunc(ctx, customerID, locationID, serviceID, firstStart)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64, int64, int64, time.Time, time.Time) error); ok {
+		r1 = returnFunc(ctx, customerID, locationID, serviceID, firstStart, generatedThrough)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -571,11 +640,12 @@ type MockBillingDocumentRepository_CreateSeries_Call struct {
 //   - locationID int64
 //   - serviceID int64
 //   - firstStart time.Time
-func (_e *MockBillingDocumentRepository_Expecter) CreateSeries(ctx any, customerID any, locationID any, serviceID any, firstStart any) *MockBillingDocumentRepository_CreateSeries_Call {
-	return &MockBillingDocumentRepository_CreateSeries_Call{Call: _e.mock.On("CreateSeries", ctx, customerID, locationID, serviceID, firstStart)}
+//   - generatedThrough time.Time
+func (_e *MockBillingDocumentRepository_Expecter) CreateSeries(ctx any, customerID any, locationID any, serviceID any, firstStart any, generatedThrough any) *MockBillingDocumentRepository_CreateSeries_Call {
+	return &MockBillingDocumentRepository_CreateSeries_Call{Call: _e.mock.On("CreateSeries", ctx, customerID, locationID, serviceID, firstStart, generatedThrough)}
 }
 
-func (_c *MockBillingDocumentRepository_CreateSeries_Call) Run(run func(ctx context.Context, customerID int64, locationID int64, serviceID int64, firstStart time.Time)) *MockBillingDocumentRepository_CreateSeries_Call {
+func (_c *MockBillingDocumentRepository_CreateSeries_Call) Run(run func(ctx context.Context, customerID int64, locationID int64, serviceID int64, firstStart time.Time, generatedThrough time.Time)) *MockBillingDocumentRepository_CreateSeries_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -597,12 +667,17 @@ func (_c *MockBillingDocumentRepository_CreateSeries_Call) Run(run func(ctx cont
 		if args[4] != nil {
 			arg4 = args[4].(time.Time)
 		}
+		var arg5 time.Time
+		if args[5] != nil {
+			arg5 = args[5].(time.Time)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
 			arg4,
+			arg5,
 		)
 	})
 	return _c
@@ -613,7 +688,7 @@ func (_c *MockBillingDocumentRepository_CreateSeries_Call) Return(n int64, err e
 	return _c
 }
 
-func (_c *MockBillingDocumentRepository_CreateSeries_Call) RunAndReturn(run func(ctx context.Context, customerID int64, locationID int64, serviceID int64, firstStart time.Time) (int64, error)) *MockBillingDocumentRepository_CreateSeries_Call {
+func (_c *MockBillingDocumentRepository_CreateSeries_Call) RunAndReturn(run func(ctx context.Context, customerID int64, locationID int64, serviceID int64, firstStart time.Time, generatedThrough time.Time) (int64, error)) *MockBillingDocumentRepository_CreateSeries_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -671,6 +746,69 @@ func (_c *MockBillingDocumentRepository_Delete_Call) Return(err error) *MockBill
 }
 
 func (_c *MockBillingDocumentRepository_Delete_Call) RunAndReturn(run func(ctx context.Context, id int64) error) *MockBillingDocumentRepository_Delete_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// EndSeries provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) EndSeries(ctx context.Context, customerID int64, id int64) error {
+	ret := _mock.Called(ctx, customerID, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for EndSeries")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64) error); ok {
+		r0 = returnFunc(ctx, customerID, id)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockBillingDocumentRepository_EndSeries_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EndSeries'
+type MockBillingDocumentRepository_EndSeries_Call struct {
+	*mock.Call
+}
+
+// EndSeries is a helper method to define mock.On call
+//   - ctx context.Context
+//   - customerID int64
+//   - id int64
+func (_e *MockBillingDocumentRepository_Expecter) EndSeries(ctx any, customerID any, id any) *MockBillingDocumentRepository_EndSeries_Call {
+	return &MockBillingDocumentRepository_EndSeries_Call{Call: _e.mock.On("EndSeries", ctx, customerID, id)}
+}
+
+func (_c *MockBillingDocumentRepository_EndSeries_Call) Run(run func(ctx context.Context, customerID int64, id int64)) *MockBillingDocumentRepository_EndSeries_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_EndSeries_Call) Return(err error) *MockBillingDocumentRepository_EndSeries_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_EndSeries_Call) RunAndReturn(run func(ctx context.Context, customerID int64, id int64) error) *MockBillingDocumentRepository_EndSeries_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -969,6 +1107,78 @@ func (_c *MockBillingDocumentRepository_HasConvertedInvoice_Call) RunAndReturn(r
 	return _c
 }
 
+// HasLiveSeries provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) HasLiveSeries(ctx context.Context, customerID int64, serviceID int64) (bool, error) {
+	ret := _mock.Called(ctx, customerID, serviceID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for HasLiveSeries")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64) (bool, error)); ok {
+		return returnFunc(ctx, customerID, serviceID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64) bool); ok {
+		r0 = returnFunc(ctx, customerID, serviceID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64, int64) error); ok {
+		r1 = returnFunc(ctx, customerID, serviceID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBillingDocumentRepository_HasLiveSeries_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HasLiveSeries'
+type MockBillingDocumentRepository_HasLiveSeries_Call struct {
+	*mock.Call
+}
+
+// HasLiveSeries is a helper method to define mock.On call
+//   - ctx context.Context
+//   - customerID int64
+//   - serviceID int64
+func (_e *MockBillingDocumentRepository_Expecter) HasLiveSeries(ctx any, customerID any, serviceID any) *MockBillingDocumentRepository_HasLiveSeries_Call {
+	return &MockBillingDocumentRepository_HasLiveSeries_Call{Call: _e.mock.On("HasLiveSeries", ctx, customerID, serviceID)}
+}
+
+func (_c *MockBillingDocumentRepository_HasLiveSeries_Call) Run(run func(ctx context.Context, customerID int64, serviceID int64)) *MockBillingDocumentRepository_HasLiveSeries_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_HasLiveSeries_Call) Return(b bool, err error) *MockBillingDocumentRepository_HasLiveSeries_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_HasLiveSeries_Call) RunAndReturn(run func(ctx context.Context, customerID int64, serviceID int64) (bool, error)) *MockBillingDocumentRepository_HasLiveSeries_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // HasPaymentKey provides a mock function for the type MockBillingDocumentRepository
 func (_mock *MockBillingDocumentRepository) HasPaymentKey(ctx context.Context, documentID int64, key string) (bool, error) {
 	ret := _mock.Called(ctx, documentID, key)
@@ -1109,6 +1319,74 @@ func (_c *MockBillingDocumentRepository_List_Call) RunAndReturn(run func(ctx con
 	return _c
 }
 
+// ListDueSeries provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) ListDueSeries(ctx context.Context, through time.Time) ([]int64, error) {
+	ret := _mock.Called(ctx, through)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListDueSeries")
+	}
+
+	var r0 []int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, time.Time) ([]int64, error)); ok {
+		return returnFunc(ctx, through)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, time.Time) []int64); ok {
+		r0 = returnFunc(ctx, through)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]int64)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, time.Time) error); ok {
+		r1 = returnFunc(ctx, through)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBillingDocumentRepository_ListDueSeries_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListDueSeries'
+type MockBillingDocumentRepository_ListDueSeries_Call struct {
+	*mock.Call
+}
+
+// ListDueSeries is a helper method to define mock.On call
+//   - ctx context.Context
+//   - through time.Time
+func (_e *MockBillingDocumentRepository_Expecter) ListDueSeries(ctx any, through any) *MockBillingDocumentRepository_ListDueSeries_Call {
+	return &MockBillingDocumentRepository_ListDueSeries_Call{Call: _e.mock.On("ListDueSeries", ctx, through)}
+}
+
+func (_c *MockBillingDocumentRepository_ListDueSeries_Call) Run(run func(ctx context.Context, through time.Time)) *MockBillingDocumentRepository_ListDueSeries_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 time.Time
+		if args[1] != nil {
+			arg1 = args[1].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_ListDueSeries_Call) Return(int64s []int64, err error) *MockBillingDocumentRepository_ListDueSeries_Call {
+	_c.Call.Return(int64s, err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_ListDueSeries_Call) RunAndReturn(run func(ctx context.Context, through time.Time) ([]int64, error)) *MockBillingDocumentRepository_ListDueSeries_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListItems provides a mock function for the type MockBillingDocumentRepository
 func (_mock *MockBillingDocumentRepository) ListItems(ctx context.Context, documentID int64) ([]model.Item, error) {
 	ret := _mock.Called(ctx, documentID)
@@ -1241,80 +1519,6 @@ func (_c *MockBillingDocumentRepository_ListPayments_Call) Return(payments []mod
 }
 
 func (_c *MockBillingDocumentRepository_ListPayments_Call) RunAndReturn(run func(ctx context.Context, documentID int64) ([]model.Payment, error)) *MockBillingDocumentRepository_ListPayments_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ListSeriesBookings provides a mock function for the type MockBillingDocumentRepository
-func (_mock *MockBillingDocumentRepository) ListSeriesBookings(ctx context.Context, customerID int64, seriesID int64) ([]model.Booking, error) {
-	ret := _mock.Called(ctx, customerID, seriesID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ListSeriesBookings")
-	}
-
-	var r0 []model.Booking
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64) ([]model.Booking, error)); ok {
-		return returnFunc(ctx, customerID, seriesID)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int64) []model.Booking); ok {
-		r0 = returnFunc(ctx, customerID, seriesID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]model.Booking)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, int64, int64) error); ok {
-		r1 = returnFunc(ctx, customerID, seriesID)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockBillingDocumentRepository_ListSeriesBookings_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListSeriesBookings'
-type MockBillingDocumentRepository_ListSeriesBookings_Call struct {
-	*mock.Call
-}
-
-// ListSeriesBookings is a helper method to define mock.On call
-//   - ctx context.Context
-//   - customerID int64
-//   - seriesID int64
-func (_e *MockBillingDocumentRepository_Expecter) ListSeriesBookings(ctx any, customerID any, seriesID any) *MockBillingDocumentRepository_ListSeriesBookings_Call {
-	return &MockBillingDocumentRepository_ListSeriesBookings_Call{Call: _e.mock.On("ListSeriesBookings", ctx, customerID, seriesID)}
-}
-
-func (_c *MockBillingDocumentRepository_ListSeriesBookings_Call) Run(run func(ctx context.Context, customerID int64, seriesID int64)) *MockBillingDocumentRepository_ListSeriesBookings_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 int64
-		if args[1] != nil {
-			arg1 = args[1].(int64)
-		}
-		var arg2 int64
-		if args[2] != nil {
-			arg2 = args[2].(int64)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-		)
-	})
-	return _c
-}
-
-func (_c *MockBillingDocumentRepository_ListSeriesBookings_Call) Return(bookings []model.Booking, err error) *MockBillingDocumentRepository_ListSeriesBookings_Call {
-	_c.Call.Return(bookings, err)
-	return _c
-}
-
-func (_c *MockBillingDocumentRepository_ListSeriesBookings_Call) RunAndReturn(run func(ctx context.Context, customerID int64, seriesID int64) ([]model.Booking, error)) *MockBillingDocumentRepository_ListSeriesBookings_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1457,6 +1661,150 @@ func (_c *MockBillingDocumentRepository_ListWorkOrders_Call) Return(bookings []m
 }
 
 func (_c *MockBillingDocumentRepository_ListWorkOrders_Call) RunAndReturn(run func(ctx context.Context, f model.WorkFilter) ([]model.Booking, error)) *MockBillingDocumentRepository_ListWorkOrders_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LockSeries provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) LockSeries(ctx context.Context, id int64) (model.SeriesRun, error) {
+	ret := _mock.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LockSeries")
+	}
+
+	var r0 model.SeriesRun
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) (model.SeriesRun, error)); ok {
+		return returnFunc(ctx, id)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) model.SeriesRun); ok {
+		r0 = returnFunc(ctx, id)
+	} else {
+		r0 = ret.Get(0).(model.SeriesRun)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = returnFunc(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockBillingDocumentRepository_LockSeries_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LockSeries'
+type MockBillingDocumentRepository_LockSeries_Call struct {
+	*mock.Call
+}
+
+// LockSeries is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+func (_e *MockBillingDocumentRepository_Expecter) LockSeries(ctx any, id any) *MockBillingDocumentRepository_LockSeries_Call {
+	return &MockBillingDocumentRepository_LockSeries_Call{Call: _e.mock.On("LockSeries", ctx, id)}
+}
+
+func (_c *MockBillingDocumentRepository_LockSeries_Call) Run(run func(ctx context.Context, id int64)) *MockBillingDocumentRepository_LockSeries_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_LockSeries_Call) Return(seriesRun model.SeriesRun, err error) *MockBillingDocumentRepository_LockSeries_Call {
+	_c.Call.Return(seriesRun, err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_LockSeries_Call) RunAndReturn(run func(ctx context.Context, id int64) (model.SeriesRun, error)) *MockBillingDocumentRepository_LockSeries_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SeriesJobEstimate provides a mock function for the type MockBillingDocumentRepository
+func (_mock *MockBillingDocumentRepository) SeriesJobEstimate(ctx context.Context, bookingID int64) (int64, int64, bool, error) {
+	ret := _mock.Called(ctx, bookingID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SeriesJobEstimate")
+	}
+
+	var r0 int64
+	var r1 int64
+	var r2 bool
+	var r3 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) (int64, int64, bool, error)); ok {
+		return returnFunc(ctx, bookingID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) int64); ok {
+		r0 = returnFunc(ctx, bookingID)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64) int64); ok {
+		r1 = returnFunc(ctx, bookingID)
+	} else {
+		r1 = ret.Get(1).(int64)
+	}
+	if returnFunc, ok := ret.Get(2).(func(context.Context, int64) bool); ok {
+		r2 = returnFunc(ctx, bookingID)
+	} else {
+		r2 = ret.Get(2).(bool)
+	}
+	if returnFunc, ok := ret.Get(3).(func(context.Context, int64) error); ok {
+		r3 = returnFunc(ctx, bookingID)
+	} else {
+		r3 = ret.Error(3)
+	}
+	return r0, r1, r2, r3
+}
+
+// MockBillingDocumentRepository_SeriesJobEstimate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SeriesJobEstimate'
+type MockBillingDocumentRepository_SeriesJobEstimate_Call struct {
+	*mock.Call
+}
+
+// SeriesJobEstimate is a helper method to define mock.On call
+//   - ctx context.Context
+//   - bookingID int64
+func (_e *MockBillingDocumentRepository_Expecter) SeriesJobEstimate(ctx any, bookingID any) *MockBillingDocumentRepository_SeriesJobEstimate_Call {
+	return &MockBillingDocumentRepository_SeriesJobEstimate_Call{Call: _e.mock.On("SeriesJobEstimate", ctx, bookingID)}
+}
+
+func (_c *MockBillingDocumentRepository_SeriesJobEstimate_Call) Run(run func(ctx context.Context, bookingID int64)) *MockBillingDocumentRepository_SeriesJobEstimate_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_SeriesJobEstimate_Call) Return(customerID int64, estimateID int64, ok bool, err error) *MockBillingDocumentRepository_SeriesJobEstimate_Call {
+	_c.Call.Return(customerID, estimateID, ok, err)
+	return _c
+}
+
+func (_c *MockBillingDocumentRepository_SeriesJobEstimate_Call) RunAndReturn(run func(ctx context.Context, bookingID int64) (int64, int64, bool, error)) *MockBillingDocumentRepository_SeriesJobEstimate_Call {
 	_c.Call.Return(run)
 	return _c
 }

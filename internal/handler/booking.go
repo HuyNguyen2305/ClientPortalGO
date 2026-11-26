@@ -60,12 +60,25 @@ func (h bookingHandler) createSeries(c *gin.Context) {
 		RespondError(c, err)
 		return
 	}
-	s, err := h.svc.BookSeries(c.Request.Context(), middleware.CustomerID(c), req.ToInput())
+	id, err := h.svc.BookSeries(c.Request.Context(), middleware.CustomerID(c), req.ToInput())
 	if err != nil {
 		RespondError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, dto.FromSeries(s, h.svc.Location()))
+	c.JSON(http.StatusCreated, dto.SeriesResponse{ID: id})
+}
+
+func (h bookingHandler) endSeries(c *gin.Context) {
+	id, err := PathID(c)
+	if err != nil {
+		RespondError(c, err)
+		return
+	}
+	if err := h.svc.EndSeries(c.Request.Context(), middleware.CustomerID(c), id); err != nil {
+		RespondError(c, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func (h bookingHandler) cancel(c *gin.Context) {

@@ -20,7 +20,7 @@ func chicago(t *testing.T) *time.Location {
 
 // hours: 07:00 to 17:00, 15-minute grid, 90 days ahead, Chicago time.
 func hours(t *testing.T) model.Hours {
-	return model.Hours{Loc: chicago(t), Open: 7 * 60, Close: 17 * 60, Step: 15, HorizonDays: 90}
+	return model.Hours{Loc: chicago(t), Open: 7 * 60, Close: 17 * 60, Step: 15, HorizonDays: 90, LeadHours: 24}
 }
 
 func date(y int, m time.Month, d int) time.Time { return time.Date(y, m, d, 0, 0, 0, 0, time.UTC) }
@@ -159,4 +159,21 @@ func TestDayBounds(t *testing.T) {
 	h := hours(t)
 	start, end := h.DayBounds(date(2026, 11, 1)) // a 25-hour day
 	assert.Equal(t, 25*time.Hour, end.Sub(start))
+}
+
+func TestSeriesDates(t *testing.T) {
+	h := hours(t)
+	// 23:30 on Nov 11 in Chicago is already Nov 12 in UTC; the local day is still the 11th.
+	late := time.Date(2026, 11, 11, 23, 30, 0, 0, h.Loc)
+	assert.Equal(t, date(2026, 11, 11), h.LocalDay(late))
+
+	t.Run("DueThrough looks one lead ahead", func(t *testing.T) {
+		assert.Equal(t, date(2026, 11, 12), h.DueThrough(time.Date(2026, 11, 11, 9, 30, 0, 0, h.Loc)))
+		assert.Equal(t, date(2026, 11, 12), h.DueThrough(late))
+	})
+
+	t.Run("SameTime keeps the business-local time of day", func(t *testing.T) {
+		first := time.Date(2026, 11, 12, 7, 15, 0, 0, h.Loc)
+		assert.Equal(t, time.Date(2027, 7, 1, 7, 15, 0, 0, h.Loc), h.SameTime(date(2027, 7, 1), first.UTC()), "across daylight saving")
+	})
 }

@@ -130,7 +130,7 @@ func positiveInt(key, def string) (int, error) {
 }
 
 // loadHours reads the booking settings: BUSINESS_TZ, BOOKING_OPEN, BOOKING_CLOSE,
-// BOOKING_STEP_MINUTES and BOOKING_HORIZON_DAYS.
+// BOOKING_STEP_MINUTES, BOOKING_HORIZON_DAYS and JOB_LEAD_HOURS.
 func loadHours() (model.Hours, error) {
 	var h model.Hours
 	var err error
@@ -154,6 +154,9 @@ func loadHours() (model.Hours, error) {
 		return h, errors.New("BOOKING_STEP_MINUTES must be a multiple of 15")
 	}
 	if h.HorizonDays, err = positiveInt("BOOKING_HORIZON_DAYS", "90"); err != nil {
+		return h, err
+	}
+	if h.LeadHours, err = positiveInt("JOB_LEAD_HOURS", "24"); err != nil {
 		return h, err
 	}
 	return h, nil

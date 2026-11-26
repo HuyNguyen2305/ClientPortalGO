@@ -27,7 +27,7 @@ type bookingFixture struct {
 func newBookingFixture(t *testing.T) bookingFixture {
 	loc, err := time.LoadLocation("America/Chicago")
 	require.NoError(t, err)
-	hours := model.Hours{Loc: loc, Open: 7 * 60, Close: 17 * 60, Step: 15, HorizonDays: 90}
+	hours := model.Hours{Loc: loc, Open: 7 * 60, Close: 17 * 60, Step: 15, HorizonDays: 90, LeadHours: 24}
 	docs := mocks.NewMockBillingDocumentRepository(t)
 	docs.EXPECT().WithTx(mock.Anything, mock.Anything).
 		RunAndReturn(func(_ context.Context, fn func(service.BillingDocumentRepository) error) error { return fn(docs) }).
@@ -181,62 +181,22 @@ func TestBookSeries(t *testing.T) {
 		f := newBookingFixture(t)
 		f.services.EXPECT().Get(mock.Anything, int64(3)).Return(weekly, nil)
 		f.locs.EXPECT().Get(mock.Anything, custID, int64(7)).Return(model.Location{ID: 7}, nil)
-		seriesID := int64(1)
-		f.docs.EXPECT().ListUpcoming(mock.Anything, custID, mock.Anything).
-			Return([]model.Booking{{SeriesID: &seriesID, Service: model.Service{ID: 3}}}, nil)
+		f.docs.EXPECT().HasLiveSeries(mock.Anything, custID, int64(3)).Return(true, nil)
 		_, err := f.svc.BookSeries(context.Background(), custID, seriesInput())
 		assert.ErrorIs(t, err, model.ErrConflict)
 	})
 
-	t.Run("books every week to the horizon and skips a taken date", func(t *testing.T) {
+	t.Run("records the series without placing any job", func(t *testing.T) {
 		f := newBookingFixture(t)
 		f.services.EXPECT().Get(mock.Anything, int64(3)).Return(weekly, nil)
 		f.locs.EXPECT().Get(mock.Anything, custID, int64(7)).Return(model.Location{ID: 7}, nil)
-		f.docs.EXPECT().ListUpcoming(mock.Anything, custID, mock.Anything).Return(nil, nil)
-		// Another customer holds 07:15-07:45 on Nov 19, which overlaps the 07:00-07:30 visit.
-		busy := model.Interval{Start: time.Date(2026, 11, 19, 7, 15, 0, 0, f.loc), End: time.Date(2026, 11, 19, 7, 45, 0, 0, f.loc)}
-		f.docs.EXPECT().BusyIntervals(mock.Anything, mock.Anything, mock.Anything).Return([]model.Interval{busy}, nil)
-		f.docs.EXPECT().CreateSeries(mock.Anything, custID, int64(7), int64(3), mock.Anything).Return(int64(5), nil)
-		// Tomorrow (Nov 12) through today + 90 days (Feb 9) holds 13 Thursdays; one is skipped.
-		var created []model.BillingDocument
-		f.docs.EXPECT().Create(mock.Anything, mock.Anything).RunAndReturn(
-			func(_ context.Context, d model.BillingDocument) (int64, error) {
-				created = append(created, d)
-				return int64(100 + len(created)), nil
-			})
-		var seriesIDs []int64
-		f.docs.EXPECT().CreateBooking(mock.Anything, mock.Anything).RunAndReturn(
-			func(_ context.Context, b model.Booking) (int64, error) {
-				require.NotNil(t, b.SeriesID)
-				seriesIDs = append(seriesIDs, *b.SeriesID)
-				return int64(len(seriesIDs)), nil
-			})
-		f.docs.EXPECT().ListSeriesBookings(mock.Anything, custID, int64(5)).Return([]model.Booking{{ID: 1}}, nil)
-
-		got, err := f.svc.BookSeries(context.Background(), custID, seriesInput())
+		f.docs.EXPECT().HasLiveSeries(mock.Anything, custID, int64(3)).Return(false, nil)
+		first := time.Date(2026, 11, 12, 7, 0, 0, 0, f.loc)
+		f.docs.EXPECT().CreateSeries(mock.Anything, custID, int64(7), int64(3), first, time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC)).
+			Return(int64(5), nil)
+		id, err := f.svc.BookSeries(context.Background(), custID, seriesInput())
 		require.NoError(t, err)
-		assert.Equal(t, int64(5), got.ID)
-		assert.Equal(t, []time.Time{time.Date(2026, 11, 19, 0, 0, 0, 0, time.UTC)}, got.Skipped)
-		assert.Len(t, created, 12)
-		assert.Len(t, seriesIDs, 12)
-		for _, d := range created {
-			assert.Equal(t, model.StatusOpen, d.Status)
-			assert.Equal(t, int64(4500), d.TotalCents)
-			assert.Len(t, d.Items, 2, "template items are copied onto each estimate")
-		}
-	})
-
-	t.Run("every date taken", func(t *testing.T) {
-		f := newBookingFixture(t)
-		one := weekly
-		one.Recurrence.EndsKind, one.Recurrence.EndsAfter = model.EndsAfter, 1
-		f.services.EXPECT().Get(mock.Anything, int64(3)).Return(one, nil)
-		f.locs.EXPECT().Get(mock.Anything, custID, int64(7)).Return(model.Location{ID: 7}, nil)
-		f.docs.EXPECT().ListUpcoming(mock.Anything, custID, mock.Anything).Return(nil, nil)
-		busy := model.Interval{Start: time.Date(2026, 11, 12, 7, 0, 0, 0, f.loc), End: time.Date(2026, 11, 12, 8, 0, 0, 0, f.loc)}
-		f.docs.EXPECT().BusyIntervals(mock.Anything, mock.Anything, mock.Anything).Return([]model.Interval{busy}, nil)
-		_, err := f.svc.BookSeries(context.Background(), custID, seriesInput())
-		assert.ErrorIs(t, err, model.ErrConflict)
+		assert.Equal(t, int64(5), id)
 	})
 
 	t.Run("the series ended before the first date", func(t *testing.T) {
@@ -246,7 +206,7 @@ func TestBookSeries(t *testing.T) {
 		ended.Recurrence.EndsKind, ended.Recurrence.EndsOn = model.EndsOnDate, &end
 		f.services.EXPECT().Get(mock.Anything, int64(3)).Return(ended, nil)
 		f.locs.EXPECT().Get(mock.Anything, custID, int64(7)).Return(model.Location{ID: 7}, nil)
-		f.docs.EXPECT().ListUpcoming(mock.Anything, custID, mock.Anything).Return(nil, nil)
+		f.docs.EXPECT().HasLiveSeries(mock.Anything, custID, int64(3)).Return(false, nil)
 		_, err := f.svc.BookSeries(context.Background(), custID, seriesInput())
 		assert.ErrorIs(t, err, model.ErrValidation)
 	})

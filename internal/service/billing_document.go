@@ -41,10 +41,23 @@ type BillingDocumentRepository interface {
 
 	// CreateBooking inserts a booking; an overlap with a live booking is ErrConflict.
 	CreateBooking(ctx context.Context, b model.Booking) (int64, error)
-	// CreateSeries inserts the series that the jobs of a recurring booking point at.
-	CreateSeries(ctx context.Context, customerID, locationID, serviceID int64, firstStart time.Time) (int64, error)
-	// ListSeriesBookings returns the jobs of one of the customer's series, soonest first.
-	ListSeriesBookings(ctx context.Context, customerID, seriesID int64) ([]model.Booking, error)
+	// CreateSeries inserts the series that the jobs of a recurring booking point at; no job is
+	// placed yet, and generatedThrough is the date before the first one.
+	CreateSeries(ctx context.Context, customerID, locationID, serviceID int64, firstStart, generatedThrough time.Time) (int64, error)
+	// HasLiveSeries reports whether the customer has a series of the service that has not ended.
+	HasLiveSeries(ctx context.Context, customerID, serviceID int64) (bool, error)
+	// EndSeries ends the customer's running series; a missing, foreign or ended one is ErrNotFound.
+	EndSeries(ctx context.Context, customerID, id int64) error
+	// ListDueSeries returns the ids of running series with dates after their cursor up to through.
+	ListDueSeries(ctx context.Context, through time.Time) ([]int64, error)
+	// LockSeries returns a running series and locks it until the transaction ends; one another
+	// instance holds, or one that has ended, is ErrNotFound.
+	LockSeries(ctx context.Context, id int64) (model.SeriesRun, error)
+	// AdvanceSeries moves the series cursor to through, and ends the series when done.
+	AdvanceSeries(ctx context.Context, id int64, through time.Time, done bool) error
+	// SeriesJobEstimate returns the customer and estimate of a booking that is a job of a series;
+	// ok is false for any other booking.
+	SeriesJobEstimate(ctx context.Context, bookingID int64) (customerID, estimateID int64, ok bool, err error)
 	// CancelBookingForEstimate cancels the live booking that created the estimate, if any.
 	CancelBookingForEstimate(ctx context.Context, estimateID int64) error
 	// BusyIntervals returns every live booking overlapping [from, to), for any customer.
@@ -299,32 +312,36 @@ func (s *BillingDocumentService) Convert(ctx context.Context, customerID, estima
 		if est.Status != model.StatusAccepted {
 			return fmt.Errorf("%w: estimate %d is %s; only accepted estimates convert", model.ErrConflict, est.Number, est.Status)
 		}
-		items, err := tx.ListItems(ctx, estimateID)
-		if err != nil {
-			return err
-		}
-		for i := range items {
-			items[i].ID = 0
-		}
-		n := s.now() // the clock's own calendar day (the app's clock is business-local), not the UTC one
-		today := time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, time.UTC)
-		invoiceID, err = tx.Create(ctx, model.BillingDocument{
-			ParentType:      model.ParentInvoice,
-			CustomerID:      customerID,
-			Location:        model.Location{ID: est.Location.ID},
-			Title:           est.Title,
-			Status:          model.StatusDraft,
-			DocumentDate:    today,
-			TotalCents:      model.SumItems(items),
-			ConvertedFromID: &est.ID,
-			Items:           items,
-		})
+		invoiceID, err = convertEstimate(ctx, tx, est, s.now())
 		return err
 	})
 	if err != nil {
 		return model.BillingDocument{}, fmt.Errorf("convert estimate: %w", err)
 	}
 	return s.Get(ctx, customerID, model.ParentInvoice, invoiceID)
+}
+
+// convertEstimate creates the draft invoice for a locked, accepted estimate, dated now's calendar
+// day (the app's clock is business-local), not the UTC one.
+func convertEstimate(ctx context.Context, tx BillingDocumentRepository, est model.BillingDocument, now time.Time) (int64, error) {
+	items, err := tx.ListItems(ctx, est.ID)
+	if err != nil {
+		return 0, err
+	}
+	for i := range items {
+		items[i].ID = 0
+	}
+	return tx.Create(ctx, model.BillingDocument{
+		ParentType:      model.ParentInvoice,
+		CustomerID:      est.CustomerID,
+		Location:        model.Location{ID: est.Location.ID},
+		Title:           est.Title,
+		Status:          model.StatusDraft,
+		DocumentDate:    time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC),
+		TotalCents:      model.SumItems(items),
+		ConvertedFromID: &est.ID,
+		Items:           items,
+	})
 }
 
 // Delete removes a draft.

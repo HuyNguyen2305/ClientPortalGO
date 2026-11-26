@@ -38,10 +38,18 @@ func New(pool *pgxpool.Pool, cfg config.Config, log *slog.Logger, gw service.Pay
 		Locations:      service.NewLocationService(locations),
 		Documents:      invoices,
 		Catalog:        service.NewCatalog(services),
-		Bookings:       service.NewBookingService(documents, locations, services, cfg.Hours, cfg.MaxLiveBookings, now),
+		Bookings:       NewBookings(pool, cfg),
 		PaymentMethods: paymentMethods,
 		TrustedProxies: cfg.TrustedProxies,
 	})
+}
+
+// NewBookings returns the booking service; main also runs its GenerateDue on a timer.
+func NewBookings(pool *pgxpool.Pool, cfg config.Config) *service.BookingService {
+	q := cfg.QueryTimeout
+	now := func() time.Time { return time.Now().In(cfg.Hours.Loc) }
+	return service.NewBookingService(docRepo{repository.NewBillingDocuments(pool, q)}, repository.NewLocations(pool, q),
+		repository.NewServices(pool, q), cfg.Hours, cfg.MaxLiveBookings, now)
 }
 
 // docRepo adapts the repository's WithTx to the service interface, so the repository
